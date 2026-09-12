@@ -1,0 +1,21 @@
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # 内部フォルダへの直接アクセスを禁止
+  RewriteRule ^(app|config|db|storage)/ - [F,L]
+
+  # 実在するファイル・ディレクトリはそのまま返す
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # それ以外は index.php へ集約
+  RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<FilesMatch "\.(sql|md|log|ini|bak)$">
+  Require all denied
+</FilesMatch>

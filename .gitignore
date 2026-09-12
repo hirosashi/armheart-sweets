@@ -1,0 +1,16 @@
+# 環境ごとの設定（DB接続情報などを含むため管理しない。config.sample.php を複製して作る）
+src/config/config.local.php
+src/config/config.sakura.php
+
+# ログ
+src/storage/logs/*
+!src/storage/logs/.gitkeep
+
+# エンドユーザー提供の原本Excel（単価等を含むため管理外。tools/source/ に手で置く）
+tools/source/*.xlsx
+
+# 作業ファイル
+/tmp/
+*.tgz
+*.zip
+.DS_Store

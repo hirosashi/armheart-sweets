@@ -1,0 +1,38 @@
+@charset "UTF-8";
+/* 発注書（ブラウザの印刷からPDFにできる） */
+@page{size:A4 portrait; margin:12mm}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  font-size:12pt; color:#000; margin:0; background:#F2F2F2;
+}
+.sheet{width:190mm; margin:0 auto; padding:8mm; background:#fff}
+.toolbar{margin-bottom:10mm; display:flex; gap:14px; align-items:center}
+.toolbar button{padding:8px 18px; font-size:12pt; cursor:pointer}
+.doc-title{font-size:20pt; text-align:center; letter-spacing:8px; margin:0 0 8mm}
+.doc-head{display:flex; justify-content:space-between; gap:8mm; margin-bottom:6mm}
+.doc-left{flex:1 1 auto}
+.doc-right{flex:0 0 72mm}
+.to{font-size:14pt; border-bottom:1px solid #000; padding-bottom:2mm; margin-bottom:4mm}
+.head-table{border-collapse:collapse; font-size:11pt; width:100%}
+.head-table th,.head-table td{border:1px solid #000; padding:2mm 3mm; text-align:left}
+.head-table th{background:#EEE; width:26mm; white-space:nowrap}
+.greeting{font-size:11pt; margin:4mm 0 0}
+.from{margin-top:4mm; font-size:11pt; line-height:1.5}
+.from-name{font-size:13pt; font-weight:bold}
+.items{width:100%; border-collapse:collapse; font-size:11pt}
+.items th,.items td{border:1px solid #000; padding:2mm 3mm}
+.items thead th{background:#EEE; text-align:center}
+.items tbody td{height:8mm}
+.items .c-no{width:10mm; text-align:center}
+.items .c-spec{width:32mm}
+.items .c-qty{width:20mm; text-align:right}
+.items .c-unit{width:16mm; text-align:center}
+.items .c-note{width:38mm}
+.items tfoot th{background:#EEE; text-align:center}
+.remarks{margin-top:4mm; font-size:11pt; border:1px solid #000; padding:3mm}
+.remarks span{font-weight:bold; margin-right:6px}
+@media print{
+  body{background:#fff}
+  .sheet{width:auto; padding:0}
+  .no-print{display:none}
+}
