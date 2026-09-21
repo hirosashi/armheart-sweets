@@ -11,15 +11,15 @@ use App\Core\Db;
  */
 class Consumption
 {
-    /** 対象週・部位の引き当てを元に戻す（記録も削除） */
-    public static function revert(string $week, int $partId, ?int $userId): void
+    /** 対象日・部位の引き当てを元に戻す（記録も削除） */
+    public static function revert(string $date, int $partId, ?int $userId): void
     {
         $rows = Db::all(
             'SELECT c.*, p.name AS part_name
                FROM part_consumptions c
                JOIN parts p ON p.id = c.part_id
-              WHERE c.target_week = ? AND c.part_id = ?',
-            [$week, $partId]
+              WHERE c.target_date = ? AND c.part_id = ?',
+            [$date, $partId]
         );
         foreach ($rows as $r) {
             if ($r['inventory_id'] === null || (float)$r['applied_qty'] <= 0) {
@@ -39,14 +39,14 @@ class Consumption
                  '製造の取り消しで戻しました：' . $r['part_name'], $userId]
             );
         }
-        Db::exec('DELETE FROM part_consumptions WHERE target_week = ? AND part_id = ?', [$week, $partId]);
+        Db::exec('DELETE FROM part_consumptions WHERE target_date = ? AND part_id = ?', [$date, $partId]);
     }
 
     /**
      * できあがった仕込み回数ぶんを在庫から引く。
      * @return array{materials:int, short:array<int,array{name:string,qty:float}>}
      */
-    public static function apply(string $week, int $partId, float $batches, ?int $userId): array
+    public static function apply(string $date, int $partId, float $batches, ?int $userId): array
     {
         $part = Db::one('SELECT name FROM parts WHERE id = ?', [$partId]);
         $result = ['materials' => 0, 'short' => []];
@@ -72,7 +72,7 @@ class Consumption
             $result['materials']++;
 
             if ((int)$line['is_stock_managed'] !== 1) {
-                self::record($week, $partId, $materialId, null, $batches, $need, 0.0, $userId);
+                self::record($date, $partId, $materialId, null, $batches, $need, 0.0, $userId);
                 continue;
             }
 
@@ -97,56 +97,56 @@ class Consumption
                     [(int)$lot['id'], $materialId, $before, $after, 'consume',
                      '製造で使用：' . $part['name'] . '（' . self::fmt($batches) . '回）', $userId]
                 );
-                self::record($week, $partId, $materialId, (int)$lot['id'], $batches, $take, $take, $userId);
+                self::record($date, $partId, $materialId, (int)$lot['id'], $batches, $take, $take, $userId);
                 $remain = round($remain - $take, 3);
             }
             if ($remain > 0) {
-                self::record($week, $partId, $materialId, null, $batches, $remain, 0.0, $userId);
+                self::record($date, $partId, $materialId, null, $batches, $remain, 0.0, $userId);
                 $result['short'][] = ['name' => $line['name'], 'qty' => $remain];
             }
         }
         return $result;
     }
 
-    /** 材料ごとの、対象週に製造で使った量（在庫一覧用） */
-    public static function usedByMaterial(string $week): array
+    /** 材料ごとの、期間に製造で使った量（在庫一覧用） */
+    public static function usedByMaterial(string $from, string $to): array
     {
         $out = [];
         foreach (Db::all(
             'SELECT material_id, SUM(qty) AS qty, SUM(applied_qty) AS applied_qty
-               FROM part_consumptions WHERE target_week = ? GROUP BY material_id',
-            [$week]
+               FROM part_consumptions WHERE target_date BETWEEN ? AND ? GROUP BY material_id',
+            [$from, $to]
         ) as $r) {
             $out[(int)$r['material_id']] = ['qty' => (float)$r['qty'], 'applied_qty' => (float)$r['applied_qty']];
         }
         return $out;
     }
 
-    /** 1材料の、製造で使った内訳（週・部位ごと） */
+    /** 1材料の、製造で使った内訳（日・部位ごと） */
     public static function detailByMaterial(int $materialId): array
     {
         return Db::all(
-            'SELECT c.target_week, p.name AS part_name, MAX(c.batches) AS batches,
+            'SELECT c.target_date, p.name AS part_name, MAX(c.batches) AS batches,
                     SUM(c.qty) AS qty, SUM(c.applied_qty) AS applied_qty, MAX(c.created_at) AS created_at
                FROM part_consumptions c
                JOIN parts p ON p.id = c.part_id
               WHERE c.material_id = ?
-              GROUP BY c.target_week, c.part_id, p.name
-              ORDER BY c.target_week DESC, p.name
+              GROUP BY c.target_date, c.part_id, p.name
+              ORDER BY c.target_date DESC, p.name
               LIMIT 50',
             [$materialId]
         );
     }
 
     private static function record(
-        string $week, int $partId, int $materialId, ?int $inventoryId,
+        string $date, int $partId, int $materialId, ?int $inventoryId,
         float $batches, float $qty, float $applied, ?int $userId
     ): void {
         Db::exec(
             'INSERT INTO part_consumptions
-                (target_week, part_id, material_id, inventory_id, batches, qty, applied_qty, created_by)
+                (target_date, part_id, material_id, inventory_id, batches, qty, applied_qty, created_by)
              VALUES (?,?,?,?,?,?,?,?)',
-            [$week, $partId, $materialId, $inventoryId, $batches, $qty, $applied, $userId]
+            [$date, $partId, $materialId, $inventoryId, $batches, $qty, $applied, $userId]
         );
     }
 

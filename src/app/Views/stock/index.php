@@ -6,7 +6,7 @@ $title = '材料の在庫';
 ?>
 <h1 class="page-title">材料の在庫（今ある材料）</h1>
 <p class="page-lead">在庫の数と、いちばん近い賞味期限を確認できます。数を直すときは材料名を押してください。<br>
-  「今週使った量」は、<a href="<?= View::e(App::url('/progress?week=' . $week)) ?>">部位の進み具合</a>で「できあがり」にしたぶんから自動で引いた量です（<?= View::e(View::d($week)) ?>（月）の週）。</p>
+  「使った量」は、<a href="<?= View::e(App::url('/progress?date=' . $date)) ?>">部位の進み具合</a>で「できあがり」にしたぶんから自動で引いた量です（<?= View::e(Clock::dayLabel($from)) ?> 〜 <?= View::e(Clock::dayLabel($date)) ?> の <?= (int)$days ?>日間）。</p>
 
 <form method="get" action="<?= View::e(App::url('/stock')) ?>" class="box">
   材料名・メーカーでさがす <input type="text" name="q" value="<?= View::e($keyword) ?>" class="w-200">
@@ -15,13 +15,19 @@ $title = '材料の在庫';
     <option value="instock" <?= $filter === 'instock' ? 'selected' : '' ?>>在庫があるものだけ</option>
     <option value="expiring" <?= $filter === 'expiring' ? 'selected' : '' ?>>期限が近いものだけ</option>
   </select>
+  　使った量の期間：
+  <select name="days">
+    <?php foreach ([1, 3, 7, 14, 31] as $n): ?>
+      <option value="<?= $n ?>" <?= $n === $days ? 'selected' : '' ?>><?= $n ?>日</option>
+    <?php endforeach; ?>
+  </select> <input type="date" name="date" value="<?= View::e($date) ?>"> まで
   <button class="btn">さがす</button>
   <span class="note">在庫を管理する材料は全部で <?= (int)$total ?> 件（多いときは300件まで表示）</span>
 </form>
 
 <table class="table">
   <thead>
-    <tr><th>材料</th><th>メーカー</th><th class="num">在庫</th><th class="num">今週使った量</th><th>いちばん近い賞味期限</th><th class="num">仕入単位</th><th></th></tr>
+    <tr><th>材料</th><th>メーカー</th><th class="num">在庫</th><th class="num">使った量（<?= (int)$days ?>日間）</th><th>いちばん近い賞味期限</th><th class="num">仕入単位</th><th></th></tr>
   </thead>
   <tbody>
   <?php foreach ($materials as $m): ?>

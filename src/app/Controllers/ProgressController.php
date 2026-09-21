@@ -10,6 +10,7 @@ use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\View;
 use App\Services\Consumption;
+use App\Services\Progress;
 use App\Services\Requirement;
 
 class ProgressController
@@ -20,43 +21,25 @@ class ProgressController
         'done'  => 'できあがり',
     ];
 
-    /** 部位の進み具合（今週つくる部位を、これから／仕込み中／できあがりで管理） */
+    /** 部位の進み具合（その日につくる部位を、これから／仕込み中／できあがりで管理。前日の残りは引き継ぐ） */
     public static function index(): void
     {
         Auth::requireLogin();
 
-        $week = Clock::weekStart(Clock::normalizeDate($_GET['week'] ?? null) ?? Clock::weekStart());
-
-        $needs = Requirement::parts($week);
-        $saved = [];
-        foreach (Db::all('SELECT * FROM part_progress WHERE target_week = ?', [$week]) as $row) {
-            $saved[(int)$row['part_id']] = $row;
-        }
+        $date = Clock::normalizeDate($_GET['date'] ?? null) ?? Clock::today();
 
         $columns = ['todo' => [], 'doing' => [], 'done' => []];
-        foreach ($needs as $need) {
-            $row = $saved[(int)$need['id']] ?? null;
-            $card = [
-                'part_id'     => (int)$need['id'],
-                'part_name'   => $need['name'],
-                'unit'        => $need['unit'],
-                'batches'     => (float)$need['batches'],
-                'need_qty'    => (float)$need['need_qty'],
-                'done_qty'    => $row ? (float)$row['done_qty'] : 0.0,
-                'status'      => $row['status'] ?? 'todo',
-                'assignee'    => $row['assignee'] ?? null,
-                'note'        => $row['note'] ?? null,
-                'updated_at'  => $row['updated_at'] ?? null,
-            ];
+        foreach (Progress::cards($date) as $card) {
+            $card['batches'] = $card['planned'] + $card['carried'];
             $columns[$card['status']][] = $card;
         }
 
         View::render('progress/index', [
-            'week'      => $week,
-            'prev_week' => Clock::shiftWeek($week, -1),
-            'next_week' => Clock::shiftWeek($week, 1),
+            'date'      => $date,
+            'prev_date' => Clock::shiftDays($date, -1),
+            'next_date' => Clock::shiftDays($date, 1),
             'columns'   => $columns,
-            'has_plan'  => Requirement::plans($week) !== [],
+            'has_plan'  => Requirement::plans($date, $date) !== [],
         ]);
     }
 
@@ -70,41 +53,43 @@ class ProgressController
             App::redirect('/progress');
         }
 
-        $week   = Clock::weekStart(Clock::normalizeDate($_POST['week'] ?? null) ?? Clock::weekStart());
+        $date   = Clock::normalizeDate($_POST['date'] ?? null) ?? Clock::today();
         $partId = (int)($_POST['part_id'] ?? 0);
         $status = (string)($_POST['status'] ?? 'todo');
         if ($partId <= 0 || !isset(self::STATUS_LABELS[$status])) {
-            App::redirect('/progress?week=' . $week);
+            App::redirect('/progress?date=' . $date);
         }
 
         $planned = (float)($_POST['planned_qty'] ?? 0);
+        $carried = Progress::carriedFor($date, $partId);
         $done    = (float)($_POST['done_qty'] ?? 0);
         if ($done < 0) {
             Session::flash('warn', 'できた回数は0以上で入力してください。');
-            App::redirect('/progress?week=' . $week);
+            App::redirect('/progress?date=' . $date);
         }
-        // できあがりで回数が空なら、予定の回数をそのまま使う
+        // できあがりで回数が空なら、予定＋引き継ぎの回数をそのまま使う
         if ($status === 'done' && $done <= 0) {
-            $done = $planned;
+            $done = $planned + $carried;
         }
 
         $pdo = Db::conn();
         $pdo->beginTransaction();
         try {
             Db::exec(
-                'INSERT INTO part_progress (target_week, part_id, planned_qty, done_qty, status, assignee, note, updated_by)
-                 VALUES (?,?,?,?,?,?,?,?)
-                 ON DUPLICATE KEY UPDATE planned_qty = VALUES(planned_qty), done_qty = VALUES(done_qty),
+                'INSERT INTO part_progress (target_date, part_id, planned_qty, carried_qty, done_qty, status, assignee, note, updated_by)
+                 VALUES (?,?,?,?,?,?,?,?,?)
+                 ON DUPLICATE KEY UPDATE planned_qty = VALUES(planned_qty), carried_qty = VALUES(carried_qty),
+                                         done_qty = VALUES(done_qty),
                                          status = VALUES(status), assignee = VALUES(assignee),
                                          note = VALUES(note), updated_by = VALUES(updated_by)',
-                [$week, $partId, $planned, $done, $status,
+                [$date, $partId, $planned, $carried, $done, $status,
                  trim((string)($_POST['assignee'] ?? '')) ?: null,
                  trim((string)($_POST['note'] ?? '')) ?: null, Auth::id()]
             );
 
-            Consumption::revert($week, $partId, Auth::id());
+            Consumption::revert($date, $partId, Auth::id());
             $applied = $status === 'done'
-                ? Consumption::apply($week, $partId, $done, Auth::id())
+                ? Consumption::apply($date, $partId, $done, Auth::id())
                 : ['materials' => 0, 'short' => []];
             $pdo->commit();
         } catch (\Throwable $e) {
@@ -112,7 +97,7 @@ class ProgressController
             throw $e;
         }
 
-        OperationLog::write('update', 'part_progress', $week . '-' . $partId, '部位の進み具合を更新しました');
+        OperationLog::write('update', 'part_progress', $date . '-' . $partId, '部位の進み具合を更新しました');
         if ($status === 'done') {
             $msg = '進み具合を更新し、' . $applied['materials'] . '材料を在庫から引きました。';
             if ($applied['short'] !== []) {
@@ -126,8 +111,10 @@ class ProgressController
             }
             Session::flash('info', $msg);
         } else {
-            Session::flash('info', '進み具合を更新しました。');
+            $rest = max(0.0, $planned + $carried - $done);
+            Session::flash('info', '進み具合を更新しました。'
+                . ($rest > 0 ? ' 残り ' . View::num($rest, 0) . ' 回は翌日に引き継がれます。' : ''));
         }
-        App::redirect('/progress?week=' . $week);
+        App::redirect('/progress?date=' . $date);
     }
 }

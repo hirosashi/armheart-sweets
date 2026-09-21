@@ -16,8 +16,8 @@ sudo mysql sweets_dev -e "SELECT MAX(id) FROM inventory_adjustments; SELECT MAX(
 ## 2. 片付け
 - 部位進捗の自動引き当てを戻す: 画面で対象部位を「これから」に戻して保存（`Consumption::revert` が在庫を復元）→ その後
   ```sql
-  DELETE FROM part_progress WHERE target_week = '<週の月曜>' AND part_id = <id>;
-  DELETE FROM part_consumptions WHERE target_week = '<週の月曜>';
+  DELETE FROM part_progress WHERE target_date = '<対象日>' AND part_id = <id>;
+  DELETE FROM part_consumptions WHERE target_date = '<対象日>';
   ```
 - テストで追加した在庫調整: `DELETE FROM inventory_adjustments WHERE id > <控えのMAX>;`（在庫数量は `inventories.qty` を控えの値に UPDATE）
 - テスト材料: `DELETE FROM materials WHERE id > <控えのMAX> AND name LIKE 'テスト%';`（配合に使っていれば `part_materials`/`product_materials` を先に削除）

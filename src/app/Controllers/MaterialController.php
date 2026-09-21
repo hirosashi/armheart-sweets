@@ -96,7 +96,7 @@ class MaterialController
 
         $id     = (int)($_POST['id'] ?? 0);
         $fields = ['name', 'alias_names', 'category', 'maker_name', 'allergens',
-                   'purchase_unit', 'price_source', 'note'];
+                   'purchase_unit', 'note'];
         $data = [];
         foreach ($fields as $f) {
             $value = trim((string)($_POST[$f] ?? ''));
@@ -105,7 +105,6 @@ class MaterialController
         $kind        = (string)($_POST['kind'] ?? 'material');
         $unit        = trim((string)($_POST['unit'] ?? 'g'));
         $purchaseQty = ($_POST['purchase_qty'] ?? '') === '' ? null : (float)$_POST['purchase_qty'];
-        $pricePerKg  = ($_POST['price_per_kg'] ?? '') === '' ? null : (float)$_POST['price_per_kg'];
         $supplierId  = (int)($_POST['supplier_id'] ?? 0) ?: null;
         $isSupplied  = isset($_POST['is_supplied']) ? 1 : 0;
         $isStock     = isset($_POST['is_stock_managed']) ? 1 : 0;
@@ -123,14 +122,14 @@ class MaterialController
 
         $params = [
             $data['name'], $data['alias_names'], $kind, $data['category'], $data['maker_name'], $data['allergens'],
-            $unit, $data['purchase_unit'], $purchaseQty, $pricePerKg, $data['price_source'],
+            $unit, $data['purchase_unit'], $purchaseQty,
             $supplierId, $isSupplied, $isStock, $hasExpiry, $data['note'],
         ];
 
         if ($id > 0) {
             Db::exec(
                 'UPDATE materials SET name=?, alias_names=?, kind=?, category=?, maker_name=?, allergens=?,
-                        unit=?, purchase_unit=?, purchase_qty=?, price_per_kg=?, price_source=?,
+                        unit=?, purchase_unit=?, purchase_qty=?,
                         supplier_id=?, is_supplied=?, is_stock_managed=?, has_expiry=?, note=?, updated_by=?
                   WHERE id = ?',
                 [...$params, Auth::id(), $id]
@@ -140,9 +139,9 @@ class MaterialController
         } else {
             $id = Db::insert(
                 'INSERT INTO materials (name, alias_names, kind, category, maker_name, allergens,
-                        unit, purchase_unit, purchase_qty, price_per_kg, price_source,
+                        unit, purchase_unit, purchase_qty,
                         supplier_id, is_supplied, is_stock_managed, has_expiry, note, created_by)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [...$params, Auth::id()]
             );
             OperationLog::write('create', 'materials', (string)$id, '材料を登録しました：' . $data['name']);

@@ -45,8 +45,6 @@ $kind = $material['kind'] ?? 'material';
   </label>
   <label>仕入単位<input type="text" name="purchase_unit" value="<?= $v('purchase_unit') ?>" class="w-100" placeholder="袋／本／ケース"></label>
   <label>仕入単位あたりの数量<input type="number" step="0.001" name="purchase_qty" value="<?= $v('purchase_qty') ?>" class="w-100" placeholder="例：25000"> <span class="note">例：1袋＝25000g なら 25000</span></label>
-  <label>kg単価（円）<input type="number" step="0.01" name="price_per_kg" value="<?= $v('price_per_kg') ?>" class="w-100"></label>
-  <label>単価の根拠<input type="text" name="price_source" value="<?= $v('price_source') ?>" class="w-200" placeholder="例：2026.05.25納品書"></label>
 
   <div class="field">
     <label class="inline"><input type="checkbox" name="is_stock_managed" <?= $checked('is_stock_managed', 1) ?>> 在庫・発注の対象にする（水などは外す）</label>

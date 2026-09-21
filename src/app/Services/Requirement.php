@@ -9,59 +9,100 @@ use App\Core\Db;
  *   1台あたり実使用量 = 充填量 ÷ 取り数 × 1台に使う個数
  *   必要バッチ数     = 台数 × 1台あたり実使用量 ÷ 歩留まり ÷ バッチ合計量（既定は切り上げ）
  *   材料の必要量     = 必要バッチ数 × バッチ配合量
+ * 生産計画は日単位。バッチ数の切り上げは「その日ごと」に行い、期間の合計はその和とする。
+ * 期間は from〜to（両端を含む）。1日ぶんは from = to で指定する。
  */
 class Requirement
 {
-    /** 対象週の生産計画 */
-    public static function plans(string $week): array
+    /** 既定の先読み期間（日） */
+    public const DEFAULT_DAYS = 7;
+    public const MIN_DAYS = 1;
+    public const MAX_DAYS = 31;
+
+    /** 画面から受けた先読み日数を 1〜31 に整える */
+    public static function normalizeDays($value): int
+    {
+        $n = (int)$value;
+        if ($n < self::MIN_DAYS) {
+            return self::DEFAULT_DAYS;
+        }
+        return min($n, self::MAX_DAYS);
+    }
+
+    /** 期間の生産計画（日付・商品ごと） */
+    public static function plans(string $from, string $to): array
     {
         return Db::all(
-            'SELECT pl.id, pl.product_id, pl.qty, p.name, p.spec
+            'SELECT pl.id, pl.target_date, pl.product_id, pl.qty, p.name, p.spec
                FROM production_plans pl
                JOIN products p ON p.id = pl.product_id
-              WHERE pl.target_week = ? AND p.deleted_at IS NULL
-              ORDER BY p.name',
-            [$week]
+              WHERE pl.target_date BETWEEN ? AND ? AND p.deleted_at IS NULL
+              ORDER BY pl.target_date, p.name',
+            [$from, $to]
         );
     }
 
-    /** 部位ごとの必要量とバッチ数 */
-    public static function parts(string $week): array
+    /** 部位ごとの必要量とバッチ数（日ごと）。target_date, part_id 順 */
+    public static function partsByDay(string $from, string $to): array
     {
         return Db::all(
-            'SELECT p.id, p.name, p.unit, p.batch_total_qty, p.yield_rate, p.round_batch,
+            'SELECT pn.target_date, p.id, p.name, p.unit, p.batch_total_qty, p.yield_rate, p.round_batch,
                     pn.need_qty,
                     CASE WHEN p.round_batch = 1
                          THEN CEILING(pn.need_qty / p.yield_rate / p.batch_total_qty)
                          ELSE pn.need_qty / p.yield_rate / p.batch_total_qty
                     END AS batches
-               FROM (SELECT pp.part_id,
+               FROM (SELECT pl.target_date, pp.part_id,
                             SUM(pl.qty * (pp.fill_qty / pp.pieces_per_fill * pp.use_pieces)) AS need_qty
                        FROM production_plans pl
                        JOIN product_parts pp ON pp.product_id = pl.product_id
-                      WHERE pl.target_week = ?
-                      GROUP BY pp.part_id) pn
+                      WHERE pl.target_date BETWEEN ? AND ?
+                      GROUP BY pl.target_date, pp.part_id) pn
                JOIN parts p ON p.id = pn.part_id
               WHERE p.batch_total_qty > 0 AND p.deleted_at IS NULL
-              ORDER BY p.name',
-            [$week]
+              ORDER BY pn.target_date, p.name',
+            [$from, $to]
         );
     }
 
-    /** 材料ごとの必要量・在庫・過不足・発注数 */
-    public static function materials(string $week): array
+    /** 1日ぶんの部位の必要量とバッチ数 */
+    public static function parts(string $date): array
     {
-        $sql = <<<'SQL'
+        return self::partsByDay($date, $date);
+    }
+
+    /** 部位ごとの期間合計（日ごとに切り上げたバッチ数の和） */
+    public static function partsTotal(string $from, string $to): array
+    {
+        $out = [];
+        foreach (self::partsByDay($from, $to) as $r) {
+            $id = (int)$r['id'];
+            if (!isset($out[$id])) {
+                $out[$id] = $r;
+                $out[$id]['need_qty'] = 0.0;
+                $out[$id]['batches']  = 0.0;
+                $out[$id]['days']     = [];
+            }
+            $out[$id]['need_qty'] += (float)$r['need_qty'];
+            $out[$id]['batches']  += (float)$r['batches'];
+            $out[$id]['days'][$r['target_date']] = (float)$r['batches'];
+        }
+        usort($out, fn($a, $b) => strcmp($a['name'], $b['name']));
+        return $out;
+    }
+
+    /** 期間の材料必要量（日ごとに切り上げたバッチ数から計算）を材料単位で集計する共通CTE */
+    private const NEED_SQL = <<<'SQL'
 WITH part_need AS (
-  SELECT pp.part_id,
+  SELECT pl.target_date, pp.part_id,
          SUM(pl.qty * (pp.fill_qty / pp.pieces_per_fill * pp.use_pieces)) AS need_qty
     FROM production_plans pl
     JOIN product_parts pp ON pp.product_id = pl.product_id
-   WHERE pl.target_week = :week1
-   GROUP BY pp.part_id
+   WHERE pl.target_date BETWEEN :from1 AND :to1
+   GROUP BY pl.target_date, pp.part_id
 ),
 part_batch AS (
-  SELECT pn.part_id,
+  SELECT pn.target_date, pn.part_id,
          CASE WHEN p.round_batch = 1
               THEN CEILING(pn.need_qty / p.yield_rate / p.batch_total_qty)
               ELSE pn.need_qty / p.yield_rate / p.batch_total_qty
@@ -71,17 +112,24 @@ part_batch AS (
    WHERE p.batch_total_qty > 0 AND p.deleted_at IS NULL
 ),
 need AS (
-  SELECT pm.material_id, SUM(pb.batches * pm.qty) AS need_qty
+  SELECT pb.target_date, pm.material_id, SUM(pb.batches * pm.qty) AS need_qty
     FROM part_batch pb
     JOIN part_materials pm ON pm.part_id = pb.part_id
-   GROUP BY pm.material_id
+   GROUP BY pb.target_date, pm.material_id
   UNION ALL
-  SELECT prm.material_id, SUM(pl.qty * prm.qty)
+  SELECT pl.target_date, prm.material_id, SUM(pl.qty * prm.qty)
     FROM production_plans pl
     JOIN product_materials prm ON prm.product_id = pl.product_id
-   WHERE pl.target_week = :week2
-   GROUP BY prm.material_id
-),
+   WHERE pl.target_date BETWEEN :from2 AND :to2
+   GROUP BY pl.target_date, prm.material_id
+)
+SQL;
+
+    /** 材料ごとの必要量・在庫・過不足・発注数（期間合計） */
+    public static function materials(string $from, string $to): array
+    {
+        $sql = self::NEED_SQL . <<<'SQL'
+,
 need_sum AS (
   SELECT material_id, SUM(need_qty) AS need_qty FROM need GROUP BY material_id
 ),
@@ -115,7 +163,46 @@ ORDER BY FIELD(CASE
     WHEN IFNULL(s.stock_qty,0) <  n.need_qty * m.safety_ratio THEN 'tight'
     ELSE 'ok' END, 'short','tight','ok','exempt'), m.name
 SQL;
-        return Db::all($sql, ['week1' => $week, 'week2' => $week]);
+        return Db::all($sql, ['from1' => $from, 'to1' => $to, 'from2' => $from, 'to2' => $to]);
+    }
+
+    /**
+     * 材料ごと・日ごとの必要量。
+     * @return array<int, array<string, float>>  material_id => [target_date => need_qty]
+     */
+    public static function materialsByDay(string $from, string $to): array
+    {
+        $sql = self::NEED_SQL . <<<'SQL'
+
+SELECT material_id, target_date, SUM(need_qty) AS need_qty
+  FROM need
+ GROUP BY material_id, target_date
+SQL;
+        $out = [];
+        foreach (Db::all($sql, ['from1' => $from, 'to1' => $to, 'from2' => $from, 'to2' => $to]) as $r) {
+            $out[(int)$r['material_id']][$r['target_date']] = (float)$r['need_qty'];
+        }
+        return $out;
+    }
+
+    /** 期間内で足りない材料の件数と、そのうち発注に載っている件数（左メニューの達成度用） */
+    public static function shortSummary(string $from, string $to): array
+    {
+        $short = array_filter(self::materials($from, $to), fn($m) => $m['judge'] === 'short');
+        $ids   = array_map(fn($m) => (int)$m['id'], $short);
+        $ordered = 0;
+        if ($ids !== []) {
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $ordered = (int)Db::value(
+                "SELECT COUNT(DISTINCT i.material_id)
+                   FROM purchase_order_items i
+                   JOIN purchase_orders o ON o.id = i.order_id
+                  WHERE o.deleted_at IS NULL AND o.status IN ('ordered','partial')
+                    AND i.material_id IN ($ph)",
+                $ids
+            );
+        }
+        return ['short' => count($short), 'ordered' => $ordered];
     }
 
     public const JUDGE_LABELS = [

@@ -3,14 +3,14 @@
 --   1台あたり実使用量 = 充填量 ÷ 取り数 × 1台に使う個数
 --   必要バッチ数       = 台数 × 1台あたり実使用量 ÷ 歩留まり ÷ バッチ合計量（既定は整数へ切り上げ）
 --   材料の必要量       = 必要バッチ数 × バッチ配合量
-SET @week = '2026-07-06';
+SET @date = '2026-07-07';
 
 WITH part_need AS (
   SELECT pp.part_id,
          SUM(pl.qty * (pp.fill_qty / pp.pieces_per_fill * pp.use_pieces)) AS need_qty
     FROM production_plans pl
     JOIN product_parts  pp ON pp.product_id = pl.product_id
-   WHERE pl.target_week = @week
+   WHERE pl.target_date = @date
    GROUP BY pp.part_id
 ),
 part_batch AS (
@@ -35,7 +35,7 @@ need AS (
   SELECT prm.material_id, SUM(pl.qty * prm.qty)
     FROM production_plans   pl
     JOIN product_materials prm ON prm.product_id = pl.product_id
-   WHERE pl.target_week = @week
+   WHERE pl.target_date = @date
    GROUP BY prm.material_id
 ),
 need_sum AS (

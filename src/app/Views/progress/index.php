@@ -2,24 +2,28 @@
 use App\Controllers\ProgressController;
 use App\Core\App;
 use App\Core\Auth;
+use App\Core\Clock;
 use App\Core\Csrf;
 use App\Core\View;
 $title = '部位の進み具合';
 $editable = Auth::can('progress');
 ?>
 <h1 class="page-title">部位の進み具合</h1>
-<p class="page-lead">今週つくる部位を、仕込みの進み方で並べています。担当と できた回数 を入れて動かしてください。<br>
+<p class="page-lead">この日につくる部位を、仕込みの進み方で並べています。担当と できた回数 を入れて動かしてください。前の日に終わらなかった回数は「前日から」として翌日に引き継がれます。<br>
   「できあがり」にすると、できた回数ぶんの材料（回数 × 1バッチの配合量）を <a href="<?= View::e(App::url('/stock')) ?>">材料の在庫</a> から自動で引きます（戻すと在庫も戻ります）。</p>
 
-<div class="week-bar">
-  <a class="btn btn-plain" href="<?= View::e(App::url('/progress?week=' . $prev_week)) ?>">← 前の週</a>
-  <strong><?= View::e(View::d($week)) ?>（月）からの1週間</strong>
-  <a class="btn btn-plain" href="<?= View::e(App::url('/progress?week=' . $next_week)) ?>">次の週 →</a>
-</div>
+<form method="get" action="<?= View::e(App::url('/progress')) ?>" class="week-bar">
+  <a class="btn btn-plain" href="<?= View::e(App::url('/progress?date=' . $prev_date)) ?>">← 前の日</a>
+  <strong><?= View::e(Clock::dayLabel($date)) ?></strong>
+  <a class="btn btn-plain" href="<?= View::e(App::url('/progress?date=' . $next_date)) ?>">次の日 →</a>
+  <span class="range-pick">日を選ぶ <input type="date" name="date" value="<?= View::e($date) ?>"> <button class="btn btn-plain">表示する</button>
+    <a href="<?= View::e(App::url('/schedule?week=' . Clock::weekStart($date))) ?>">スケジュールで見る</a></span>
+</form>
 
-<?php if (!$has_plan): ?>
-  <p class="alert alert-warn">この週のつくる数が入っていません。
-    <a href="<?= View::e(App::url('/require?week=' . $week)) ?>">必要な材料と足りない分</a>の画面で台数を入れてください。</p>
+<?php if (!$has_plan && $columns === ['todo' => [], 'doing' => [], 'done' => []]): ?>
+  <p class="alert alert-warn">この日のつくる数が入っていません。
+    <a href="<?= View::e(App::url('/schedule?week=' . Clock::weekStart($date))) ?>">スケジュール</a>か
+    <a href="<?= View::e(App::url('/require?date=' . $date)) ?>">必要な材料と足りない分</a>の画面で台数を入れてください。</p>
 <?php endif; ?>
 
 <div class="kanban">
@@ -30,14 +34,18 @@ $editable = Auth::can('progress');
         <div class="kanban-card">
           <div class="kanban-title"><?= View::e($c['part_name']) ?></div>
           <div class="kanban-body">
-            仕込み <strong><?= View::e(View::num($c['batches'], 0)) ?> 回</strong>／必要 <?= View::e(View::num($c['need_qty'], 1)) ?><?= View::e($c['unit']) ?>
+            仕込み <strong><?= View::e(View::num($c['batches'], 0)) ?> 回</strong>
+            <?php if ($c['carried'] > 0): ?>
+              <span class="carry">（この日 <?= View::e(View::num($c['planned'], 0)) ?> ＋ 前日から <?= View::e(View::num($c['carried'], 0)) ?>）</span>
+            <?php endif; ?>
+            <?php if ($c['need_qty'] > 0): ?>／必要 <?= View::e(View::num($c['need_qty'], 1)) ?><?= View::e($c['unit']) ?><?php endif; ?>
           </div>
           <?php if ($editable): ?>
           <form method="post" action="<?= View::e(App::url('/progress/save')) ?>">
             <?= Csrf::field() ?>
-            <input type="hidden" name="week" value="<?= View::e($week) ?>">
+            <input type="hidden" name="date" value="<?= View::e($date) ?>">
             <input type="hidden" name="part_id" value="<?= (int)$c['part_id'] ?>">
-            <input type="hidden" name="planned_qty" value="<?= View::e($c['batches']) ?>">
+            <input type="hidden" name="planned_qty" value="<?= View::e($c['planned']) ?>">
             <label class="kanban-label">できた回数
               <input type="number" step="0.001" min="0" name="done_qty" value="<?= View::e($c['done_qty']) ?>"
                      placeholder="<?= View::e(View::num($c['batches'], 0)) ?>" class="w-80"></label>

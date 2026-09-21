@@ -36,6 +36,9 @@ $check('daysLater(5)',   Clock::daysLater(5),          '2026-07-12');
 $check('weekStart',      Clock::weekStart(),           '2026-07-06'); // 火曜→同週の月曜
 $check('weekStart(月)',  Clock::weekStart('2026-07-06'), '2026-07-06');
 $check('shiftWeek(+1)',  Clock::shiftWeek('2026-07-06', 1), '2026-07-13');
+$check('shiftDays(-1)',  Clock::shiftDays('2026-07-07', -1), '2026-07-06');
+$check('rangeEnd(7)',    Clock::rangeEnd('2026-07-07', 7), '2026-07-13');
+$check('weekDays',       Clock::weekDays('2026-07-06')[6], '2026-07-12');
 $check('daysUntil(明後日)', Clock::daysUntil('2026-07-09'), 2);
 $check('daysUntil(前日)',   Clock::daysUntil('2026-07-06'), -1);
 $check('parse(空)',      Clock::parse(''),             null);

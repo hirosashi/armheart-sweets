@@ -43,7 +43,7 @@ $title = 'ホーム';
     <tr><th>パーツ</th><td><?= (int)$counts['parts'] ?> 件</td></tr>
     <tr><th>材料</th><td><?= (int)$counts['materials'] ?> 件</td></tr>
     <tr><th>業者</th><td><?= (int)$counts['suppliers'] ?> 件</td></tr>
-    <tr><th>今週（月曜日から）</th><td><?= View::e(View::d($week_start)) ?> の週</td></tr>
+    <tr><th>今日</th><td><?= View::e(View::d($week_start)) ?>（<a href="<?= View::e(App::url('/schedule')) ?>">今週のスケジュールを見る</a>）</td></tr>
   </tbody>
 </table>
 

@@ -42,7 +42,7 @@ class PartController
         }
 
         $materials = Db::all(
-            'SELECT pm.*, m.name AS material_name, m.unit, m.maker_name, m.price_per_kg, m.is_stock_managed
+            'SELECT pm.*, m.name AS material_name, m.unit, m.maker_name, m.is_stock_managed
                FROM part_materials pm
                JOIN materials m ON m.id = pm.material_id
               WHERE pm.part_id = ? AND m.deleted_at IS NULL

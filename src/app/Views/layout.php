@@ -5,8 +5,9 @@ use App\Core\Clock;
 use App\Core\View;
 use App\Services\Flow;
 
-// 毎週の作業で使う画面（いつも出しておく）
+// 日々の作業で使う画面（いつも出しておく）
 $menuWork = [
+    ['label' => 'スケジュール',             'path' => '/schedule'],
     ['label' => '必要な材料と足りない分', 'path' => '/require'],
     ['label' => '発注の管理',             'path' => '/orders'],
     ['label' => '部位の進み具合',         'path' => '/progress'],
@@ -32,11 +33,11 @@ foreach ($menuSetup as $m) {
     }
 }
 
-$flowWeek  = Clock::weekStart();
+$flowDate  = Clock::today();
 $flowSteps = [];
 if (Auth::check()) {
     try {
-        $flowSteps = Flow::steps($flowWeek);
+        $flowSteps = Flow::steps($flowDate);
     } catch (\Throwable $e) {
         $flowSteps = [];
     }
@@ -97,8 +98,8 @@ $flowHref = static function (array $step): string {
     <?php if ($flowSteps !== []): ?>
       <div class="flow">
         <div class="flow-head">
-          業務工程
-          <span class="flow-week"><?= View::e(Clock::dayLabel($flowWeek)) ?>の週　<?= (int)$flowDone['done'] ?>/<?= (int)$flowDone['total'] ?>済</span>
+          業務の進み具合
+          <span class="flow-week"><?= View::e(Clock::dayLabel($flowDate)) ?>　<?= (int)$flowDone['done'] ?>/<?= (int)$flowDone['total'] ?>済</span>
         </div>
         <?php $group = ''; ?>
         <?php foreach ($flowSteps as $step): ?>
@@ -112,6 +113,9 @@ $flowHref = static function (array $step): string {
             <span class="flow-body">
               <span class="flow-label"><?= View::e($step['label']) ?></span>
               <span class="flow-detail"><?= View::e($step['detail']) ?><?php if ($step['current']): ?><span class="flow-next">つぎに実施</span><?php endif; ?></span>
+              <?php if ($step['rate'] !== null): ?>
+                <span class="bar"><span class="bar-fill" style="width:<?= (int)$step['rate'] ?>%"></span></span>
+              <?php endif; ?>
             </span>
             <span class="flow-state flow-<?= View::e($step['state']) ?>"><?= View::e(Flow::STATE_LABELS[$step['state']]) ?></span>
           </a>

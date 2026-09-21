@@ -21,7 +21,7 @@ description: スイーツ生産管理システム（アルムハート／phase1_
 - すべて `App\Core\Clock` 経由。`date()` `time()` `strtotime()` `new DateTime()` `NOW()` `CURDATE()` を業務コードで直接書かない
 - PHP `Asia/Tokyo`（`Clock::init()`）、MySQL 接続直後に `SET time_zone='+09:00'`
 - 保存 `DATETIME` の `Y-m-d H:i:s`（`TIMESTAMP` 禁止）、表示 `Y/m/d H:i`（`View::dt()`）、日付 `View::d()`
-- 週は月曜始まり `Clock::weekStart()`
+- 業務データは日単位（`target_date`）。スケジュール表示だけ月曜始まりの週 `Clock::weekStart()` / `Clock::weekDays()`。先読み期間は `Requirement::DEFAULT_DAYS`(7)
 
 ## セキュリティ／権限
 - GET は `Auth::requireLogin()`、POST は `Csrf::verify()` → `Auth::can('<area>')` → `Validator` → `OperationLog::write()`
@@ -33,10 +33,12 @@ description: スイーツ生産管理システム（アルムハート／phase1_
 - 必要バッチ数 = 台数 × 実使用量 ÷ 歩留まり(0.9) ÷ バッチ合計量（既定で切り上げ）
 - 材料必要量 = 必要バッチ数 × バッチ配合量。水は必要量に含めるが在庫・発注対象外（`is_stock_managed=0`）
 - 部位「できあがり」で `Consumption::apply`（できた回数 × 配合量を賞味期限順に在庫から引く）、戻すと `revert`
-- 業務工程12手順は `Services/Flow.php`。状態は 済／途中／未実施
+- 終わらなかった仕込み（予定＋前日から − できた回数）は翌日へ引き継ぐ（`Services/Progress.php`）
+- 価格・単価は扱わない（DB列は残すが画面・入力・seedに出さない）。発注は数量のみ。状態 draft/ordered/partial/delivered/canceled、partial は品目の納品数から自動判定（`Services/Orders.php`）
+- 左メニューの「業務の進み具合」は `Services/Flow.php`（はじめの準備／今日の状況／進行中の発注ごとの納品率）。状態は 済／途中／未実施
 
 ## UI／文言
-- ヘッダー1行（タイトル=ホームリンク、運用メニュー、登録・確認プルダウン、右端ユーザー/ログアウト）固定。左250pxは「業務工程」固定
+- ヘッダー1行（タイトル=ホームリンク、運用メニュー、登録・確認プルダウン、右端ユーザー/ログアウト）固定。左250pxは「業務の進み具合」固定
 - 現場向けの平易な日本語（「直す」「やめる」「足りない分」「できあがり」）。専門用語・英語を画面に出さない
 - 件数の多い select は `class="select-search"`
 - `.table-narrow` に max-width を付けない（ユーザー指示）
