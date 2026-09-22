@@ -9,20 +9,35 @@ use App\Core\Db;
 use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\View;
+use App\Services\Jobs;
 use App\Services\Requirement;
 
 class RequireController
 {
-    /** 必要な材料と足りない分 */
+    /** 必要な材料と足りない分（開始日から先読み期間ぶんをまとめて見る） */
     public static function index(): void
     {
         Auth::requireLogin();
 
-        $week = Clock::normalizeDate($_GET['week'] ?? null) ?? Clock::weekStart();
-        $week = Clock::weekStart($week);
+        $date = Clock::normalizeDate($_GET['date'] ?? null) ?? Clock::today();
+        $days = Requirement::normalizeDays($_GET['days'] ?? Requirement::DEFAULT_DAYS);
+        $to   = Clock::rangeEnd($date, $days);
         $only = ($_GET['only'] ?? '') === 'short';
+        $jobId = (int)($_GET['job'] ?? 0) > 0 ? (int)$_GET['job'] : null;
+        $job   = $jobId !== null ? Jobs::find($jobId) : null;
+        if ($jobId !== null && $job === null) {
+            Session::flash('warn', 'その発注は見つかりません。');
+            App::redirect('/require');
+        }
+        if ($job !== null) {
+            // 1件の発注に絞るときは、その発注の仕込み日〜仕上げ日をまとめて見る
+            $first = Db::value('SELECT MIN(target_date) FROM job_parts WHERE job_id = ?', [$jobId]);
+            $date  = $first ?: $job['finish_date'];
+            $to    = max($job['finish_date'], (string)Db::value('SELECT IFNULL(MAX(target_date), ?) FROM job_parts WHERE job_id = ?', [$job['finish_date'], $jobId]));
+            $days  = (int)Clock::parse($date)->diff(Clock::parse($to))->days + 1;
+        }
 
-        $materials = Requirement::materials($week);
+        $materials = Requirement::materials($date, $to, $jobId);
         $summary = ['short' => 0, 'tight' => 0, 'ok' => 0, 'exempt' => 0];
         foreach ($materials as $row) {
             $summary[$row['judge']]++;
@@ -34,64 +49,44 @@ class RequireController
             ));
         }
 
+        $plansByDay = [];
+        foreach (Requirement::plans($date, $to, $jobId) as $pl) {
+            $plansByDay[$pl['target_date']][] = $pl;
+        }
+        $hasParts = $jobId !== null
+            ? Db::value('SELECT COUNT(*) FROM job_parts WHERE job_id = ?', [$jobId]) > 0
+            : Db::value('SELECT COUNT(*) FROM job_parts jp JOIN jobs j ON j.id = jp.job_id
+                          WHERE j.status IN (\'open\',\'done\') AND jp.target_date BETWEEN ? AND ?', [$date, $to]) > 0;
+
         View::render('require/index', [
-            'week'       => $week,
-            'prev_week'  => Clock::shiftWeek($week, -1),
-            'next_week'  => Clock::shiftWeek($week, 1),
-            'only'       => $only,
-            'plans'      => Requirement::plans($week),
-            'parts'      => Requirement::parts($week),
-            'materials'  => $materials,
-            'summary'    => $summary,
-            'products'   => Db::all('SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name'),
+            'date'        => $date,
+            'to'          => $to,
+            'days'        => $days,
+            'day_list'    => self::dayList($date, $days),
+            'prev_date'   => Clock::shiftDays($date, -1),
+            'next_date'   => Clock::shiftDays($date, 1),
+            'only'        => $only,
+            'job'         => $job,
+            'job_id'      => $jobId,
+            'plans_by_day' => $plansByDay,
+            'has_data'    => $hasParts || $plansByDay !== [],
+            'parts'       => Requirement::partsTotal($date, $to, $jobId),
+            'materials'   => $materials,
+            'need_by_day' => Requirement::materialsByDay($date, $to, $jobId),
+            'summary'     => $summary,
         ]);
     }
 
-    /** 「今週つくる数」の登録 */
-    public static function savePlan(): void
+    private static function dayList(string $from, int $days): array
     {
-        Auth::requireLogin();
-        Csrf::verify();
-        if (!Auth::can('require')) {
-            Session::flash('warn', 'この操作をする権限がありません。');
-            App::redirect('/require');
+        $out = [];
+        for ($i = 0; $i < $days; $i++) {
+            $out[] = Clock::shiftDays($from, $i);
         }
-
-        $week = Clock::weekStart(Clock::normalizeDate($_POST['week'] ?? null) ?? Clock::weekStart());
-
-        // 既存の行（一覧の入力欄）をまとめて更新する
-        foreach ((array)($_POST['plan_qty'] ?? []) as $productId => $qty) {
-            $productId = (int)$productId;
-            $qty       = (int)$qty;
-            if ($qty > 0) {
-                Db::exec(
-                    'INSERT INTO production_plans (target_week, product_id, qty, created_by)
-                     VALUES (?,?,?,?)
-                     ON DUPLICATE KEY UPDATE qty = VALUES(qty), updated_by = VALUES(created_by)',
-                    [$week, $productId, $qty, Auth::id()]
-                );
-            } else {
-                Db::exec('DELETE FROM production_plans WHERE target_week = ? AND product_id = ?', [$week, $productId]);
-            }
-        }
-
-        // 追加行（商品を選んで数を入れる）
-        $newProduct = (int)($_POST['new_product_id'] ?? 0);
-        $newQty     = (int)($_POST['new_qty'] ?? 0);
-        if ($newProduct > 0 && $newQty > 0) {
-            Db::exec(
-                'INSERT INTO production_plans (target_week, product_id, qty, created_by) VALUES (?,?,?,?)
-                 ON DUPLICATE KEY UPDATE qty = VALUES(qty), updated_by = VALUES(created_by)',
-                [$week, $newProduct, $newQty, Auth::id()]
-            );
-        }
-
-        OperationLog::write('update', 'production_plans', $week, 'つくる数を登録しました');
-        Session::flash('info', 'つくる数を登録しました。必要な材料を計算しなおしました。');
-        App::redirect('/require?week=' . $week);
+        return $out;
     }
 
-    /** 足りない材料を発注（未発注）に追加する */
+    /** 足りない材料を発注（未発注）に追加する。発注には対象期間（どの日ぶんか）を記録する */
     public static function createOrders(): void
     {
         Auth::requireLogin();
@@ -101,15 +96,19 @@ class RequireController
             App::redirect('/require');
         }
 
-        $week     = Clock::weekStart(Clock::normalizeDate($_POST['week'] ?? null) ?? Clock::weekStart());
-        $targets  = array_map('intval', (array)($_POST['material_id'] ?? []));
+        $date    = Clock::normalizeDate($_POST['date'] ?? null) ?? Clock::today();
+        $days    = Requirement::normalizeDays($_POST['days'] ?? Requirement::DEFAULT_DAYS);
+        $to      = Clock::rangeEnd($date, $days);
+        $jobId   = (int)($_POST['job'] ?? 0) > 0 ? (int)$_POST['job'] : null;
+        $back    = $jobId !== null ? '/require?job=' . $jobId : '/require?date=' . $date . '&days=' . $days;
+        $targets = array_map('intval', (array)($_POST['material_id'] ?? []));
         if ($targets === []) {
             Session::flash('warn', '発注に追加する材料を選んでください。');
-            App::redirect('/require?week=' . $week);
+            App::redirect($back);
         }
 
         $rows = array_filter(
-            Requirement::materials($week),
+            Requirement::materials($date, $to, $jobId),
             static fn($r) => in_array((int)$r['id'], $targets, true)
                 && $r['order_qty'] !== null && (float)$r['order_qty'] > 0
         );
@@ -129,11 +128,11 @@ class RequireController
         foreach ($bySupplier as $supplierId => $items) {
             $orderId = Db::insert(
                 'INSERT INTO purchase_orders (order_no, company_id, supplier_id, delivery_place, status,
-                        order_date, desired_date, note, created_by)
-                 VALUES (?,?,?,?,?,?,?,?,?)',
+                        order_date, period_from, period_to, job_id, desired_date, note, created_by)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                 [self::nextOrderNo(), $company['id'] ?? null, $supplierId, $company['delivery_place'] ?? null,
-                 'draft', Clock::today(), Clock::daysLater(7),
-                 Clock::d($week) . 'の週の生産計画から作成', Auth::id()]
+                 'draft', Clock::today(), $date, $to, $jobId, $date,
+                 Clock::dayLabel($date) . '〜' . Clock::dayLabel($to) . 'の発注（つくる予定）から作成', Auth::id()]
             );
             foreach ($items as $i => $row) {
                 Db::exec(
@@ -151,7 +150,7 @@ class RequireController
             ? "発注（未発注）を{$created}件つくりました。「発注の管理」で内容を確認して発注書を印刷できます。"
             : '発注に追加できる材料がありませんでした。';
         if ($noSupplier !== []) {
-            $msg .= '業者が未登録のため追加できなかった材料：' . implode('、', array_slice($noSupplier, 0, 5))
+            $msg .= '仕入先が未登録のため追加できなかった材料：' . implode('、', array_slice($noSupplier, 0, 5))
                  . (count($noSupplier) > 5 ? ' ほか' . (count($noSupplier) - 5) . '件' : '');
         }
         Session::flash($created > 0 ? 'info' : 'warn', $msg);

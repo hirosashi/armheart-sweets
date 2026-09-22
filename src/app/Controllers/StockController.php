@@ -10,6 +10,7 @@ use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\View;
 use App\Services\Consumption;
+use App\Services\Requirement;
 
 class StockController
 {
@@ -58,12 +59,16 @@ class StockController
             $params
         );
 
-        $week = Clock::weekStart(Clock::normalizeDate($_GET['week'] ?? null) ?? Clock::weekStart());
+        $date = Clock::normalizeDate($_GET['date'] ?? null) ?? Clock::today();
+        $days = Requirement::normalizeDays($_GET['days'] ?? Requirement::DEFAULT_DAYS);
+        $from = Clock::shiftDays($date, -($days - 1));
 
         View::render('stock/index', [
             'materials' => $materials,
-            'week'      => $week,
-            'used'      => Consumption::usedByMaterial($week),
+            'date'      => $date,
+            'days'      => $days,
+            'from'      => $from,
+            'used'      => Consumption::usedByMaterial($from, $date),
             'keyword'   => $keyword,
             'filter'    => $filter,
             'today'     => Clock::today(),

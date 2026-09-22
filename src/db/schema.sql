@@ -229,7 +229,7 @@ CREATE TABLE product_materials (
 -- ============================================================
 CREATE TABLE production_plans (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  target_week  DATE         NOT NULL COMMENT '対象週の月曜日',
+  target_date  DATE         NOT NULL COMMENT '対象日',
   product_id   INT UNSIGNED NOT NULL,
   qty          INT UNSIGNED NOT NULL COMMENT '生産数',
   note         VARCHAR(255) NULL,
@@ -238,15 +238,16 @@ CREATE TABLE production_plans (
   created_by   INT UNSIGNED NULL,
   updated_by   INT UNSIGNED NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_production_plans (target_week, product_id),
+  UNIQUE KEY uq_production_plans (target_date, product_id),
   CONSTRAINT fk_plan_product FOREIGN KEY (product_id) REFERENCES products(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='週次生産計画';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日別生産計画';
 
 CREATE TABLE part_progress (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  target_week  DATE         NOT NULL COMMENT '対象週の月曜日',
+  target_date  DATE         NOT NULL COMMENT '対象日',
   part_id      INT UNSIGNED NOT NULL,
-  planned_qty  DECIMAL(12,3) NOT NULL DEFAULT 0 COMMENT '必要数',
+  planned_qty  DECIMAL(12,3) NOT NULL DEFAULT 0 COMMENT '必要数（その日の計画分）',
+  carried_qty  DECIMAL(12,3) NOT NULL DEFAULT 0 COMMENT '前日から引き継いだ残り回数',
   done_qty     DECIMAL(12,3) NOT NULL DEFAULT 0 COMMENT '完成数',
   status       ENUM('todo','doing','done') NOT NULL DEFAULT 'todo' COMMENT '未着手/製造中/完成',
   assignee     VARCHAR(100) NULL COMMENT '担当',
@@ -255,7 +256,7 @@ CREATE TABLE part_progress (
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   updated_by   INT UNSIGNED NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_part_progress (target_week, part_id),
+  UNIQUE KEY uq_part_progress (target_date, part_id),
   CONSTRAINT fk_progress_part FOREIGN KEY (part_id) REFERENCES parts(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='パーツ別生産進捗（かんばん）';
 
@@ -302,8 +303,10 @@ CREATE TABLE purchase_orders (
   company_id    INT UNSIGNED NULL COMMENT '発注元（自社）',
   supplier_id   INT UNSIGNED NOT NULL,
   delivery_place VARCHAR(255) NULL COMMENT '納品場所',
-  status        ENUM('draft','ordered','delivered','canceled') NOT NULL DEFAULT 'draft' COMMENT '未発注/発注済/納品済/取消',
+  status        ENUM('draft','ordered','partial','delivered','canceled') NOT NULL DEFAULT 'draft' COMMENT '未発注/発注済/一部納品/納品済/取消',
   order_date    DATE         NULL COMMENT '発注日',
+  period_from   DATE         NULL COMMENT '対象期間（この日から）',
+  period_to     DATE         NULL COMMENT '対象期間（この日まで）',
   desired_date  DATE         NULL COMMENT '希望納品日',
   delivered_date DATE        NULL COMMENT '納品日',
   subtotal      DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '小計(税抜)',
@@ -342,3 +345,24 @@ CREATE TABLE purchase_order_items (
   CONSTRAINT fk_poi_order    FOREIGN KEY (order_id)    REFERENCES purchase_orders(id) ON DELETE CASCADE,
   CONSTRAINT fk_poi_material FOREIGN KEY (material_id) REFERENCES materials(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='発注明細';
+
+-- ============================================================
+-- 7. 製造による材料使用（できあがり時に在庫から自動で引いた記録）
+-- ============================================================
+CREATE TABLE part_consumptions (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  target_date   DATE          NOT NULL COMMENT '対象日（できあがりを入れた日）',
+  part_id       INT UNSIGNED  NOT NULL,
+  material_id   INT UNSIGNED  NOT NULL,
+  inventory_id  INT UNSIGNED  NULL COMMENT '引いた在庫ロット（在庫が無く引けなかった分はNULL）',
+  batches       DECIMAL(12,3) NOT NULL COMMENT 'できた仕込み回数',
+  qty           DECIMAL(12,3) NOT NULL COMMENT '使った量（計算値）',
+  applied_qty   DECIMAL(12,3) NOT NULL DEFAULT 0 COMMENT '実際に在庫から引いた量',
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by    INT UNSIGNED NULL,
+  PRIMARY KEY (id),
+  KEY idx_consume_date_part (target_date, part_id),
+  KEY idx_consume_material (material_id, target_date),
+  CONSTRAINT fk_consume_part     FOREIGN KEY (part_id)     REFERENCES parts(id),
+  CONSTRAINT fk_consume_material FOREIGN KEY (material_id) REFERENCES materials(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='製造による材料使用（自動引き当て）';

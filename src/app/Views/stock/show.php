@@ -18,9 +18,7 @@ $stockSum = array_sum(array_map(static fn($l) => (float)$l['qty'], $lots));
     <tr><th>仕入単位</th><td><?php if ($material['purchase_qty'] !== null): ?>
             <?= View::e(View::num($material['purchase_qty'], 0)) ?><?= View::e($material['unit']) ?>／<?= View::e($material['purchase_unit']) ?>
         <?php endif; ?></td>
-        <th>kg単価</th><td><?= $material['price_per_kg'] !== null ? View::e(View::num($material['price_per_kg'], 2)) . ' 円' : '' ?>
-            <span class="note"><?= View::e($material['price_source']) ?></span></td></tr>
-    <tr><th>アレルゲン</th><td colspan="3"><?= View::e($material['allergens']) ?></td></tr>
+        <th>アレルゲン</th><td><?= View::e($material['allergens']) ?></td></tr>
     <tr><th>今ある量（合計）</th><td colspan="3"><strong><?= View::e(View::num($stockSum, 1)) ?><?= View::e($material['unit']) ?></strong></td></tr>
   </tbody>
 </table>
@@ -83,11 +81,11 @@ $stockSum = array_sum(array_map(static fn($l) => (float)$l['qty'], $lots));
 <h2 class="sec-title">製造で使った内訳</h2>
 <p class="note">部位の進み具合で「できあがり」にしたときに、回数 × 1バッチの配合量 で自動で引いた量です。</p>
 <table class="table table-narrow">
-  <thead><tr><th>週</th><th>部位</th><th class="num">できた回数</th><th class="num">使った量</th><th class="num">在庫から引いた量</th><th>日時</th></tr></thead>
+  <thead><tr><th>日</th><th>部位</th><th class="num">できた回数</th><th class="num">使った量</th><th class="num">在庫から引いた量</th><th>日時</th></tr></thead>
   <tbody>
   <?php foreach ($consumed as $c): ?>
     <tr>
-      <td><?= View::e(View::d($c['target_week'])) ?>（月）の週</td>
+      <td><a href="<?= View::e(App::url('/progress?date=' . $c['target_date'])) ?>"><?= View::e(View::d($c['target_date'])) ?></a></td>
       <td><?= View::e($c['part_name']) ?></td>
       <td class="num"><?= View::e(View::num($c['batches'], 1)) ?> 回</td>
       <td class="num"><?= View::e(View::num($c['qty'], 1)) ?><?= View::e($material['unit']) ?></td>

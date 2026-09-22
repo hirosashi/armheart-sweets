@@ -14,6 +14,7 @@ use App\Controllers\PartController;
 use App\Controllers\ProductController;
 use App\Controllers\ProgressController;
 use App\Controllers\RequireController;
+use App\Controllers\ScheduleController;
 use App\Controllers\StockController;
 
 $router = new Router();
@@ -44,13 +45,18 @@ $router->get('/parts/show',      [PartController::class, 'show']);
 $router->post('/parts/save',     [PartController::class, 'save']);
 $router->post('/parts/material', [PartController::class, 'saveMaterial']);
 
+// スケジュール（発注ごとのガントチャート）
+$router->get('/schedule',             [ScheduleController::class, 'index']);
+$router->post('/schedule/job',        [ScheduleController::class, 'saveJob']);
+$router->post('/schedule/job/delete', [ScheduleController::class, 'deleteJob']);
+$router->post('/schedule/part',       [ScheduleController::class, 'savePart']);
+
 // 部位の進み具合
 $router->get('/progress',       [ProgressController::class, 'index']);
 $router->post('/progress/save', [ProgressController::class, 'save']);
 
 // 必要な材料と足りない分
 $router->get('/require',        [RequireController::class, 'index']);
-$router->post('/require/plan',  [RequireController::class, 'savePlan']);
 $router->post('/require/order', [RequireController::class, 'createOrders']);
 
 // 発注
@@ -59,6 +65,7 @@ $router->get('/orders/show',   [OrderController::class, 'show']);
 $router->get('/orders/print',  [OrderController::class, 'print']);
 $router->post('/orders/save',  [OrderController::class, 'save']);
 $router->post('/orders/status', [OrderController::class, 'updateStatus']);
+$router->post('/orders/receive', [OrderController::class, 'receive']);
 
 // 材料の在庫・棚卸し
 $router->get('/stock',         [StockController::class, 'index']);

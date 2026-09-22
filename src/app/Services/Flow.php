@@ -5,18 +5,23 @@ use App\Core\Clock;
 use App\Core\Db;
 
 /**
- * 業務の流れ（手順）と、その手順が済んでいるかの判定。
- * 左の「工程フロー」に表示する。
+ * 左メニューに出す「業務の進み具合」。
+ *   はじめの準備 … マスタが整っているか（最初に1回）
+ *   今日の状況   … つくる数・仕込み・足りない材料・賞味期限（日単位、足りない材料は先読み期間）
+ *   進行中の発注 … 発注（得意先からの注文）1件ごとの仕込みの達成率（スケジュールのガントチャートと同じ数字）
+ *   材料の発注   … 仕入先への発注1件ごとの納品率（発注は1日で終わらないので「済／未」ではなく達成度で追う）
  *
  * 状態は3つ。
- *   done    … 済（入力・確認が終わっている）
- *   partial … 途中（一部だけ終わっている）
+ *   done    … 済（入力・確認が終わっている／全部納品）
+ *   partial … 途中
  *   todo    … 未実施
  */
 class Flow
 {
-    public const GROUP_SETUP = 'はじめの準備';
-    public const GROUP_WEEK  = '今週の流れ';
+    public const GROUP_SETUP  = 'はじめの準備';
+    public const GROUP_TODAY  = '今日の状況';
+    public const GROUP_JOBS   = '進行中の発注';
+    public const GROUP_ORDERS = '材料の発注';
 
     public const STATE_LABELS = [
         'done'    => '済',
@@ -24,39 +29,43 @@ class Flow
         'todo'    => '未実施',
     ];
 
+    /** 賞味期限が「近い」とみなす日数 */
+    public const EXPIRY_SOON_DAYS = 7;
+
     /** 同じ画面表示中に何度も数え直さないための控え */
     private static array $cache = [];
 
     /**
-     * 手順の一覧を返す。
-     * 各要素: no / label / path / group / state / detail / current
+     * 項目の一覧を返す。
+     * 各要素: no / label / path / group / state / detail / rate(0-100 or null) / current
      */
-    public static function steps(?string $week = null): array
+    public static function steps(?string $date = null): array
     {
-        $week = $week !== null && $week !== '' ? $week : Clock::weekStart();
-        if (isset(self::$cache[$week])) {
-            return self::$cache[$week];
+        $date = $date !== null && $date !== '' ? $date : Clock::today();
+        if (isset(self::$cache[$date])) {
+            return self::$cache[$date];
         }
-        $steps = array_merge(self::setupSteps(), self::weeklySteps($week));
+        $steps = array_merge(self::setupSteps(), self::todaySteps($date), self::jobSteps(), self::orderSteps());
 
         $no = 1;
         foreach ($steps as $i => $step) {
             $steps[$i]['no']      = $no++;
             $steps[$i]['current'] = false;
+            $steps[$i]['rate']    = $step['rate'] ?? null;
         }
 
-        // いま実施すべき手順＝今週の流れのうち、最初の「済」でない手順
+        // いま実施すべき手順＝今日の状況のうち、最初の「済」でない項目
         foreach ($steps as $i => $step) {
-            if ($step['group'] === self::GROUP_WEEK && $step['state'] !== 'done') {
+            if ($step['group'] === self::GROUP_TODAY && $step['state'] !== 'done') {
                 $steps[$i]['current'] = true;
                 break;
             }
         }
-        self::$cache[$week] = $steps;
+        self::$cache[$date] = $steps;
         return $steps;
     }
 
-    /** 済んだ手順の数と全体数 */
+    /** 済んだ項目の数と全体数 */
     public static function summary(array $steps): array
     {
         $done = 0;
@@ -129,134 +138,145 @@ class Flow
                 'detail' => $stockTargets > 0
                     ? $stockEntered . '／' . $stockTargets . '件 入力済み'
                     : '対象なし',
+                'rate'   => $stockTargets > 0 ? self::rate($stockEntered, $stockTargets) : null,
             ],
         ];
     }
 
-    /** 毎週の流れ */
-    private static function weeklySteps(string $week): array
+    /** 今日の状況（日単位。足りない材料は先読み期間ぶん） */
+    private static function todaySteps(string $date): array
     {
-        $weekEnd = Clock::shiftWeek($week, 1);
+        $days = Requirement::DEFAULT_DAYS;
+        $to   = Clock::rangeEnd($date, $days);
 
-        $planQty  = (int)Db::value('SELECT IFNULL(SUM(qty),0) FROM production_plans WHERE target_week = ?', [$week]);
-        $partCnt  = $planQty > 0 ? count(Requirement::parts($week)) : 0;
+        $planToday  = (int)Db::value(
+            "SELECT COUNT(*) FROM jobs WHERE status = 'open' AND finish_date = ?",
+            [$date]
+        );
+        $planPeriod = (int)Db::value(
+            "SELECT COUNT(*) FROM jobs j WHERE j.status IN ('open','done')
+               AND (j.finish_date BETWEEN ? AND ?
+                    OR EXISTS (SELECT 1 FROM job_parts jp WHERE jp.job_id = j.id AND jp.target_date BETWEEN ? AND ?))",
+            [$date, $to, $date, $to]
+        );
+
+        $prog = Progress::summary($date);
 
         // 材料の判定は重い計算なので、つくる数が入っているときだけ数える
-        $shortCnt = 0;
-        if ($planQty > 0) {
-            foreach (Requirement::materials($week) as $m) {
-                if ($m['judge'] === 'short') {
-                    $shortCnt++;
-                }
-            }
+        $short = ['short' => 0, 'ordered' => 0];
+        if ($planPeriod > 0) {
+            $short = Requirement::shortSummary($date, $to);
         }
 
-        $orders = Db::one(
-            "SELECT COUNT(*) AS cnt,
-                    SUM(status = 'draft')     AS draft,
-                    SUM(status = 'ordered')   AS ordered,
-                    SUM(status = 'delivered') AS delivered
-               FROM purchase_orders
-              WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ?",
-            [$week . ' 00:00:00', $weekEnd . ' 00:00:00']
-        ) ?? ['cnt' => 0, 'draft' => 0, 'ordered' => 0, 'delivered' => 0];
-
-        $orderCnt  = (int)$orders['cnt'];
-        $draft     = (int)$orders['draft'];
-        $ordered   = (int)$orders['ordered'];
-        $delivered = (int)$orders['delivered'];
-
-        $orderedMaterials = (int)Db::value(
-            'SELECT COUNT(DISTINCT i.material_id)
-               FROM purchase_order_items i
-               JOIN purchase_orders o ON o.id = i.order_id
-              WHERE o.deleted_at IS NULL AND o.created_at >= ? AND o.created_at < ?',
-            [$week . ' 00:00:00', $weekEnd . ' 00:00:00']
-        );
-
-        $progDone = (int)Db::value(
-            "SELECT COUNT(*) FROM part_progress WHERE target_week = ? AND status = 'done'",
-            [$week]
-        );
-        $progDoing = (int)Db::value(
-            "SELECT COUNT(*) FROM part_progress WHERE target_week = ? AND status <> 'todo'",
-            [$week]
-        );
-
-        $adjust = (int)Db::value(
-            'SELECT COUNT(*) FROM inventory_adjustments WHERE created_at >= ? AND created_at < ?',
-            [$week . ' 00:00:00', $weekEnd . ' 00:00:00']
+        $expiring = (int)Db::value(
+            'SELECT COUNT(*) FROM inventory iv JOIN materials m ON m.id = iv.material_id
+              WHERE iv.qty > 0 AND m.deleted_at IS NULL AND iv.expiry_date IS NOT NULL AND iv.expiry_date <= ?',
+            [Clock::shiftDays($date, self::EXPIRY_SOON_DAYS)]
         );
 
         return [
             [
-                'group'  => self::GROUP_WEEK,
-                'label'  => 'つくる数を入力',
-                'path'   => '/require#plan',
-                'state'  => $planQty > 0 ? 'done' : 'todo',
-                'detail' => $planQty > 0 ? '合計 ' . number_format($planQty) . '台' : 'つくる数が未入力',
+                'group'  => self::GROUP_TODAY,
+                'label'  => '発注（つくる予定）を登録',
+                'path'   => '/schedule',
+                'state'  => $planPeriod > 0 ? 'done' : 'todo',
+                'detail' => $planPeriod > 0
+                    ? $days . '日間に ' . $planPeriod . '件' . ($planToday > 0 ? '（今日仕上げ ' . $planToday . '件）' : '')
+                    : '発注が未登録',
             ],
             [
-                'group'  => self::GROUP_WEEK,
-                'label'  => '部位ごとの仕込み回数を確認',
-                'path'   => '/require#batch',
-                'state'  => $planQty > 0 && $partCnt > 0 ? 'done' : 'todo',
-                'detail' => $partCnt > 0 ? $partCnt . '部位の回数を計算済み' : '計算するとここに出ます',
+                'group'  => self::GROUP_TODAY,
+                'label'  => '今日の仕込み',
+                'path'   => '/progress',
+                'state'  => self::state($prog['total'] > 0 && $prog['done'] >= $prog['total'], $prog['done'] > 0),
+                'detail' => $prog['total'] > 0
+                    ? 'できあがり ' . $prog['done'] . '／' . $prog['total'] . '部位'
+                      . ($prog['carried'] > 0 ? '（前日から ' . $prog['carried'] . '）' : '')
+                    : '今日つくる部位がありません',
+                'rate'   => $prog['total'] > 0 ? self::rate($prog['done'], $prog['total']) : null,
             ],
             [
-                'group'  => self::GROUP_WEEK,
-                'label'  => '足りない材料をチェックして発注に追加',
+                'group'  => self::GROUP_TODAY,
+                'label'  => '足りない材料（' . $days . '日先読み）',
                 'path'   => '/require#short',
                 'state'  => self::state(
-                    $planQty > 0 && ($shortCnt === 0 || $orderedMaterials >= $shortCnt),
-                    $orderedMaterials > 0
+                    $planPeriod > 0 && ($short['short'] === 0 || $short['ordered'] >= $short['short']),
+                    $short['ordered'] > 0
                 ),
-                'detail' => $shortCnt > 0
-                    ? '足りない ' . $shortCnt . '件／発注に入れた ' . $orderedMaterials . '件'
-                    : ($planQty > 0 ? '足りない材料はありません' : 'つくる数の入力後に出ます'),
+                'detail' => $short['short'] > 0
+                    ? '不足 ' . $short['short'] . '件／うち発注済 ' . $short['ordered'] . '件'
+                    : ($planPeriod > 0 ? '足りない材料はありません' : '発注の登録後に出ます'),
+                'rate'   => $short['short'] > 0 ? self::rate($short['ordered'], $short['short']) : null,
             ],
             [
-                'group'  => self::GROUP_WEEK,
-                'label'  => '内容と希望納期を確認',
-                'path'   => '/orders?status=draft',
-                'state'  => self::state($orderCnt > 0 && $draft === 0, $orderCnt > 0),
-                'detail' => $orderCnt > 0 ? '未発注 ' . $draft . '件' : '今週の発注はまだありません',
-            ],
-            [
-                'group'  => self::GROUP_WEEK,
-                'label'  => '発注書を印刷して送り、発注済にする',
-                'path'   => '/orders?status=draft',
-                'state'  => self::state($orderCnt > 0 && $draft === 0, $ordered + $delivered > 0),
-                'detail' => $orderCnt > 0
-                    ? '発注済 ' . ($ordered + $delivered) . '／' . $orderCnt . '件'
-                    : '今週の発注はまだありません',
-            ],
-            [
-                'group'  => self::GROUP_WEEK,
-                'label'  => '担当とできた数を入力',
-                'path'   => '/progress',
-                'state'  => self::state($partCnt > 0 && $progDone >= $partCnt, $progDoing > 0),
-                'detail' => $partCnt > 0
-                    ? 'できあがり ' . $progDone . '／' . $partCnt . '部位'
-                    : '今週つくる部位がありません',
-            ],
-            [
-                'group'  => self::GROUP_WEEK,
-                'label'  => '入荷・使った分を直す',
+                'group'  => self::GROUP_TODAY,
+                'label'  => '賞味期限が近い在庫',
                 'path'   => '/stock',
-                'state'  => $adjust > 0 ? 'done' : 'todo',
-                'detail' => $adjust > 0 ? '今週 ' . $adjust . '件 調整' : '今週の調整はまだありません',
-            ],
-            [
-                'group'  => self::GROUP_WEEK,
-                'label'  => '届いた発注を納品済にする',
-                'path'   => '/orders?status=ordered',
-                'state'  => self::state($orderCnt > 0 && $ordered === 0 && $delivered > 0, $delivered > 0),
-                'detail' => $orderCnt > 0
-                    ? '納品済 ' . $delivered . '／' . $orderCnt . '件'
-                    : '今週の発注はまだありません',
+                'state'  => $expiring === 0 ? 'done' : 'partial',
+                'detail' => $expiring > 0
+                    ? $expiring . 'ロットが' . self::EXPIRY_SOON_DAYS . '日以内に期限'
+                    : '期限が近いものはありません',
             ],
         ];
+    }
+
+    /** 進行中の発注（得意先からの注文。1件ごとの仕込みの達成率） */
+    private static function jobSteps(): array
+    {
+        $out  = [];
+        $jobs = Jobs::open(8);
+        $rows = Jobs::partRows(array_map(fn($j) => (int)$j['id'], $jobs));
+        foreach ($jobs as $j) {
+            $ach = Jobs::achievement($rows[(int)$j['id']] ?? []);
+            $out[] = [
+                'group'  => self::GROUP_JOBS,
+                'label'  => ($j['customer_name'] ? $j['customer_name'] . '　' : '') . $j['product_name'] . ' ' . $j['qty'] . '台',
+                'path'   => '/schedule?from=' . Clock::weekStart($j['delivery_date']),
+                'state'  => self::state($ach['total'] > 0 && $ach['done'] >= $ach['total'], $ach['done'] > 0 || $ach['doing'] > 0),
+                'detail' => '納品 ' . Clock::dayLabel($j['delivery_date']) . '　仕込み ' . $ach['done'] . '／' . $ach['total'] . '部位',
+                'rate'   => $ach['rate'],
+            ];
+        }
+        if ($out === []) {
+            $out[] = [
+                'group'  => self::GROUP_JOBS,
+                'label'  => '進行中の発注はありません',
+                'path'   => '/schedule',
+                'state'  => 'done',
+                'detail' => 'スケジュールで登録した発注がここに並びます',
+            ];
+        }
+        return $out;
+    }
+
+    /** 材料の発注（仕入先への発注。1件ごとの納品率） */
+    private static function orderSteps(): array
+    {
+        $out = [];
+        foreach (Orders::open(8) as $o) {
+            $isDraft = $o['status'] === 'draft';
+            $out[] = [
+                'group'  => self::GROUP_ORDERS,
+                'label'  => $o['supplier_name'],
+                'path'   => '/orders/show?id=' . $o['id'],
+                'state'  => $isDraft ? 'todo' : ($o['received_count'] > 0 ? 'partial' : 'todo'),
+                'detail' => $isDraft
+                    ? '未発注　' . $o['item_count'] . '品目'
+                    : '納品 ' . $o['received_count'] . '／' . $o['item_count'] . '品目'
+                      . ($o['desired_date'] ? '　納期 ' . Clock::dayLabel($o['desired_date']) : ''),
+                'rate'   => $isDraft ? 0 : $o['rate'],
+            ];
+        }
+        if ($out === []) {
+            $out[] = [
+                'group'  => self::GROUP_ORDERS,
+                'label'  => '進行中の材料の発注はありません',
+                'path'   => '/orders',
+                'state'  => 'done',
+                'detail' => '納品済・取消以外の発注がここに並びます',
+            ];
+        }
+        return $out;
     }
 
     private static function state(bool $done, bool $partial): string
@@ -265,5 +285,10 @@ class Flow
             return 'done';
         }
         return $partial ? 'partial' : 'todo';
+    }
+
+    private static function rate(int $done, int $total): int
+    {
+        return $total > 0 ? (int)floor(min($done, $total) * 100 / $total) : 0;
     }
 }

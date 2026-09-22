@@ -26,8 +26,8 @@ $editable = Auth::can('material');
 
 <table class="table">
   <thead>
-    <tr><th>材料名</th><th>別の呼び方</th><th>種類</th><th>メーカー</th><th>業者</th>
-        <th class="num">kg単価</th><th>単価の根拠</th><th>在庫管理</th><th class="num">配合で使用</th>
+    <tr><th>材料名</th><th>別の呼び方</th><th>種類</th><th>メーカー</th><th>仕入先</th>
+        <th>在庫管理</th><th class="num">配合で使用</th>
         <?php if ($editable): ?><th></th><?php endif; ?></tr>
   </thead>
   <tbody>
@@ -39,8 +39,6 @@ $editable = Auth::can('material');
       <td><?= View::e(MaterialController::KIND_LABELS[$m['kind']] ?? $m['kind']) ?></td>
       <td><?= View::e($m['maker_name']) ?></td>
       <td><?= View::e($m['supplier_name']) ?></td>
-      <td class="num"><?= $m['price_per_kg'] !== null ? View::e(View::num($m['price_per_kg'], 2)) : '' ?></td>
-      <td class="small"><?= View::e($m['price_source']) ?></td>
       <td><?= (int)$m['is_stock_managed'] === 1 ? 'する' : 'しない' ?></td>
       <td class="num"><?= (int)$m['used_parts'] ?></td>
       <?php if ($editable): ?>
@@ -49,7 +47,7 @@ $editable = Auth::can('material');
     </tr>
   <?php endforeach; ?>
   <?php if ($materials === []): ?>
-    <tr><td colspan="<?= $editable ? 10 : 9 ?>" class="text-center">材料が見つかりませんでした。</td></tr>
+    <tr><td colspan="<?= $editable ? 8 : 7 ?>" class="text-center">材料が見つかりませんでした。</td></tr>
   <?php endif; ?>
   </tbody>
 </table>

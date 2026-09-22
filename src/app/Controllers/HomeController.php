@@ -23,7 +23,7 @@ class HomeController
 
         View::render('home', [
             'counts'      => $counts,
-            'week_start'  => Clock::weekStart(),
+            'week_start'  => Clock::today(),
             'server_time' => Clock::dt(Clock::now()),
             'db_time'     => Clock::dt((string)Db::value('SELECT NOW()')),
         ]);
