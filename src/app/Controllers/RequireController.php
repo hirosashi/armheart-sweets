@@ -177,7 +177,7 @@ class RequireController
             ? "発注（未発注）を{$created}件つくりました。「発注の管理」で内容を確認して発注書を印刷できます。"
             : '発注に追加できる材料がありませんでした。';
         if ($noSupplier !== []) {
-            $msg .= '業者が未登録のため追加できなかった材料：' . implode('、', array_slice($noSupplier, 0, 5))
+            $msg .= '仕入先が未登録のため追加できなかった材料：' . implode('、', array_slice($noSupplier, 0, 5))
                  . (count($noSupplier) > 5 ? ' ほか' . (count($noSupplier) - 5) . '件' : '');
         }
         Session::flash($created > 0 ? 'info' : 'warn', $msg);

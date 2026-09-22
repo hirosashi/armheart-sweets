@@ -35,7 +35,7 @@ $kind = $material['kind'] ?? 'material';
   <label>単位（在庫・配合で使う） <span class="req">必須</span>
     <input type="text" name="unit" value="<?= $isNew ? 'g' : $v('unit') ?>" maxlength="20" required class="w-80" placeholder="g／枚／個">
   </label>
-  <label>業者（発注先）
+  <label>仕入先
     <select name="supplier_id" class="select-search">
       <option value="">-- 未設定 --</option>
       <?php foreach ($suppliers as $s): ?>

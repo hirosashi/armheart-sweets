@@ -134,7 +134,7 @@ $q = fn(string $d) => '/require?date=' . $d . '&days=' . $days;
         <th class="w-30">発注</th><th>材料・資材</th><th>メーカー</th>
         <?php if ($showDays): foreach ($day_list as $d): ?><th class="num small"><?= View::e(Clock::dayLabel($d)) ?></th><?php endforeach; endif; ?>
         <th class="num">必要な量（合計）</th><th class="num">今ある量</th><th class="num">過不足</th>
-        <th>判定</th><th class="num">発注数</th><th>業者</th>
+        <th>判定</th><th class="num">発注数</th><th>仕入先</th>
       </tr>
     </thead>
     <tbody>
@@ -170,7 +170,7 @@ $q = fn(string $d) => '/require?date=' . $d . '&days=' . $days;
 
   <?php if (Auth::can('order')): ?>
     <p><button class="btn">チェックした材料を発注（未発注）に追加する</button>
-       <span class="note">業者ごとに1件の発注をつくります。発注には「<?= View::e(Clock::dayLabel($date)) ?>〜<?= View::e(Clock::dayLabel($to)) ?>のぶん」と記録されます。</span></p>
+       <span class="note">仕入先ごとに1件の発注をつくります。発注には「<?= View::e(Clock::dayLabel($date)) ?>〜<?= View::e(Clock::dayLabel($to)) ?>のぶん」と記録されます。</span></p>
   <?php endif; ?>
 </form>
 <?php endif; ?>

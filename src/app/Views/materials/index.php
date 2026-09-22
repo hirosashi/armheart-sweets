@@ -26,7 +26,7 @@ $editable = Auth::can('material');
 
 <table class="table">
   <thead>
-    <tr><th>材料名</th><th>別の呼び方</th><th>種類</th><th>メーカー</th><th>業者</th>
+    <tr><th>材料名</th><th>別の呼び方</th><th>種類</th><th>メーカー</th><th>仕入先</th>
         <th>在庫管理</th><th class="num">配合で使用</th>
         <?php if ($editable): ?><th></th><?php endif; ?></tr>
   </thead>
