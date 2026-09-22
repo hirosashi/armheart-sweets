@@ -8,7 +8,8 @@ use App\Core\Db;
  * 左メニューに出す「業務の進み具合」。
  *   はじめの準備 … マスタが整っているか（最初に1回）
  *   今日の状況   … つくる数・仕込み・足りない材料・賞味期限（日単位、足りない材料は先読み期間）
- *   進行中の発注 … 発注1件ごとの納品率（発注は1日で終わらないので「済／未」ではなく達成度で追う）
+ *   進行中の発注 … 発注（得意先からの注文）1件ごとの仕込みの達成率（スケジュールのガントチャートと同じ数字）
+ *   材料の発注   … 仕入先への発注1件ごとの納品率（発注は1日で終わらないので「済／未」ではなく達成度で追う）
  *
  * 状態は3つ。
  *   done    … 済（入力・確認が終わっている／全部納品）
@@ -19,7 +20,8 @@ class Flow
 {
     public const GROUP_SETUP  = 'はじめの準備';
     public const GROUP_TODAY  = '今日の状況';
-    public const GROUP_ORDERS = '進行中の発注';
+    public const GROUP_JOBS   = '進行中の発注';
+    public const GROUP_ORDERS = '材料の発注';
 
     public const STATE_LABELS = [
         'done'    => '済',
@@ -43,7 +45,7 @@ class Flow
         if (isset(self::$cache[$date])) {
             return self::$cache[$date];
         }
-        $steps = array_merge(self::setupSteps(), self::todaySteps($date), self::orderSteps());
+        $steps = array_merge(self::setupSteps(), self::todaySteps($date), self::jobSteps(), self::orderSteps());
 
         $no = 1;
         foreach ($steps as $i => $step) {
@@ -147,8 +149,16 @@ class Flow
         $days = Requirement::DEFAULT_DAYS;
         $to   = Clock::rangeEnd($date, $days);
 
-        $planToday  = (int)Db::value('SELECT IFNULL(SUM(qty),0) FROM production_plans WHERE target_date = ?', [$date]);
-        $planPeriod = (int)Db::value('SELECT IFNULL(SUM(qty),0) FROM production_plans WHERE target_date BETWEEN ? AND ?', [$date, $to]);
+        $planToday  = (int)Db::value(
+            "SELECT COUNT(*) FROM jobs WHERE status = 'open' AND finish_date = ?",
+            [$date]
+        );
+        $planPeriod = (int)Db::value(
+            "SELECT COUNT(*) FROM jobs j WHERE j.status IN ('open','done')
+               AND (j.finish_date BETWEEN ? AND ?
+                    OR EXISTS (SELECT 1 FROM job_parts jp WHERE jp.job_id = j.id AND jp.target_date BETWEEN ? AND ?))",
+            [$date, $to, $date, $to]
+        );
 
         $prog = Progress::summary($date);
 
@@ -167,12 +177,12 @@ class Flow
         return [
             [
                 'group'  => self::GROUP_TODAY,
-                'label'  => 'つくる数を入力',
+                'label'  => '発注（つくる予定）を登録',
                 'path'   => '/schedule',
-                'state'  => $planToday > 0 ? 'done' : ($planPeriod > 0 ? 'partial' : 'todo'),
+                'state'  => $planPeriod > 0 ? 'done' : 'todo',
                 'detail' => $planPeriod > 0
-                    ? '今日 ' . number_format($planToday) . '台／' . $days . '日間 ' . number_format($planPeriod) . '台'
-                    : 'つくる数が未入力',
+                    ? $days . '日間に ' . $planPeriod . '件' . ($planToday > 0 ? '（今日仕上げ ' . $planToday . '件）' : '')
+                    : '発注が未登録',
             ],
             [
                 'group'  => self::GROUP_TODAY,
@@ -195,7 +205,7 @@ class Flow
                 ),
                 'detail' => $short['short'] > 0
                     ? '不足 ' . $short['short'] . '件／うち発注済 ' . $short['ordered'] . '件'
-                    : ($planPeriod > 0 ? '足りない材料はありません' : 'つくる数の入力後に出ます'),
+                    : ($planPeriod > 0 ? '足りない材料はありません' : '発注の登録後に出ます'),
                 'rate'   => $short['short'] > 0 ? self::rate($short['ordered'], $short['short']) : null,
             ],
             [
@@ -210,7 +220,36 @@ class Flow
         ];
     }
 
-    /** 進行中の発注（1件ごとの納品率） */
+    /** 進行中の発注（得意先からの注文。1件ごとの仕込みの達成率） */
+    private static function jobSteps(): array
+    {
+        $out  = [];
+        $jobs = Jobs::open(8);
+        $rows = Jobs::partRows(array_map(fn($j) => (int)$j['id'], $jobs));
+        foreach ($jobs as $j) {
+            $ach = Jobs::achievement($rows[(int)$j['id']] ?? []);
+            $out[] = [
+                'group'  => self::GROUP_JOBS,
+                'label'  => ($j['customer_name'] ? $j['customer_name'] . '　' : '') . $j['product_name'] . ' ' . $j['qty'] . '台',
+                'path'   => '/schedule?from=' . Clock::weekStart($j['delivery_date']),
+                'state'  => self::state($ach['total'] > 0 && $ach['done'] >= $ach['total'], $ach['done'] > 0 || $ach['doing'] > 0),
+                'detail' => '納品 ' . Clock::dayLabel($j['delivery_date']) . '　仕込み ' . $ach['done'] . '／' . $ach['total'] . '部位',
+                'rate'   => $ach['rate'],
+            ];
+        }
+        if ($out === []) {
+            $out[] = [
+                'group'  => self::GROUP_JOBS,
+                'label'  => '進行中の発注はありません',
+                'path'   => '/schedule',
+                'state'  => 'done',
+                'detail' => 'スケジュールで登録した発注がここに並びます',
+            ];
+        }
+        return $out;
+    }
+
+    /** 材料の発注（仕入先への発注。1件ごとの納品率） */
     private static function orderSteps(): array
     {
         $out = [];
@@ -231,7 +270,7 @@ class Flow
         if ($out === []) {
             $out[] = [
                 'group'  => self::GROUP_ORDERS,
-                'label'  => '進行中の発注はありません',
+                'label'  => '進行中の材料の発注はありません',
                 'path'   => '/orders',
                 'state'  => 'done',
                 'detail' => '納品済・取消以外の発注がここに並びます',

@@ -17,13 +17,12 @@ $editable = Auth::can('progress');
   <strong><?= View::e(Clock::dayLabel($date)) ?></strong>
   <a class="btn btn-plain" href="<?= View::e(App::url('/progress?date=' . $next_date)) ?>">次の日 →</a>
   <span class="range-pick">日を選ぶ <input type="date" name="date" value="<?= View::e($date) ?>"> <button class="btn btn-plain">表示する</button>
-    <a href="<?= View::e(App::url('/schedule?week=' . Clock::weekStart($date))) ?>">スケジュールで見る</a></span>
+    <a href="<?= View::e(App::url('/schedule?from=' . Clock::weekStart($date))) ?>">スケジュールで見る</a></span>
 </form>
 
 <?php if (!$has_plan && $columns === ['todo' => [], 'doing' => [], 'done' => []]): ?>
-  <p class="alert alert-warn">この日のつくる数が入っていません。
-    <a href="<?= View::e(App::url('/schedule?week=' . Clock::weekStart($date))) ?>">スケジュール</a>か
-    <a href="<?= View::e(App::url('/require?date=' . $date)) ?>">必要な材料と足りない分</a>の画面で台数を入れてください。</p>
+  <p class="alert alert-warn">この日に仕込む部位がありません。
+    <a href="<?= View::e(App::url('/schedule?from=' . Clock::weekStart($date))) ?>">スケジュール</a>で発注（つくる予定）を追加するか、部位の仕込み日を動かしてください。</p>
 <?php endif; ?>
 
 <div class="kanban">

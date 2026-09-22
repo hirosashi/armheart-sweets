@@ -9,6 +9,7 @@ use App\Core\Db;
 use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\View;
+use App\Services\Jobs;
 use App\Services\Requirement;
 
 class RequireController
@@ -22,8 +23,21 @@ class RequireController
         $days = Requirement::normalizeDays($_GET['days'] ?? Requirement::DEFAULT_DAYS);
         $to   = Clock::rangeEnd($date, $days);
         $only = ($_GET['only'] ?? '') === 'short';
+        $jobId = (int)($_GET['job'] ?? 0) > 0 ? (int)$_GET['job'] : null;
+        $job   = $jobId !== null ? Jobs::find($jobId) : null;
+        if ($jobId !== null && $job === null) {
+            Session::flash('warn', 'その発注は見つかりません。');
+            App::redirect('/require');
+        }
+        if ($job !== null) {
+            // 1件の発注に絞るときは、その発注の仕込み日〜仕上げ日をまとめて見る
+            $first = Db::value('SELECT MIN(target_date) FROM job_parts WHERE job_id = ?', [$jobId]);
+            $date  = $first ?: $job['finish_date'];
+            $to    = max($job['finish_date'], (string)Db::value('SELECT IFNULL(MAX(target_date), ?) FROM job_parts WHERE job_id = ?', [$job['finish_date'], $jobId]));
+            $days  = (int)Clock::parse($date)->diff(Clock::parse($to))->days + 1;
+        }
 
-        $materials = Requirement::materials($date, $to);
+        $materials = Requirement::materials($date, $to, $jobId);
         $summary = ['short' => 0, 'tight' => 0, 'ok' => 0, 'exempt' => 0];
         foreach ($materials as $row) {
             $summary[$row['judge']]++;
@@ -36,9 +50,13 @@ class RequireController
         }
 
         $plansByDay = [];
-        foreach (Requirement::plans($date, $to) as $pl) {
+        foreach (Requirement::plans($date, $to, $jobId) as $pl) {
             $plansByDay[$pl['target_date']][] = $pl;
         }
+        $hasParts = $jobId !== null
+            ? Db::value('SELECT COUNT(*) FROM job_parts WHERE job_id = ?', [$jobId]) > 0
+            : Db::value('SELECT COUNT(*) FROM job_parts jp JOIN jobs j ON j.id = jp.job_id
+                          WHERE j.status IN (\'open\',\'done\') AND jp.target_date BETWEEN ? AND ?', [$date, $to]) > 0;
 
         View::render('require/index', [
             'date'        => $date,
@@ -48,13 +66,14 @@ class RequireController
             'prev_date'   => Clock::shiftDays($date, -1),
             'next_date'   => Clock::shiftDays($date, 1),
             'only'        => $only,
-            'plans'       => $plansByDay[$date] ?? [],
+            'job'         => $job,
+            'job_id'      => $jobId,
             'plans_by_day' => $plansByDay,
-            'parts'       => Requirement::partsTotal($date, $to),
+            'has_data'    => $hasParts || $plansByDay !== [],
+            'parts'       => Requirement::partsTotal($date, $to, $jobId),
             'materials'   => $materials,
-            'need_by_day' => Requirement::materialsByDay($date, $to),
+            'need_by_day' => Requirement::materialsByDay($date, $to, $jobId),
             'summary'     => $summary,
-            'products'    => Db::all('SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name'),
         ]);
     }
 
@@ -65,53 +84,6 @@ class RequireController
             $out[] = Clock::shiftDays($from, $i);
         }
         return $out;
-    }
-
-    /** その日につくる数の登録（必要な材料の画面・スケジュールの両方から使う） */
-    public static function savePlan(): void
-    {
-        Auth::requireLogin();
-        Csrf::verify();
-        if (!Auth::can('require')) {
-            Session::flash('warn', 'この操作をする権限がありません。');
-            App::redirect('/require');
-        }
-
-        $date = Clock::normalizeDate($_POST['date'] ?? null) ?? Clock::today();
-        $back = ($_POST['back'] ?? '') === 'schedule'
-            ? '/schedule?week=' . Clock::weekStart($date)
-            : '/require?date=' . $date . '&days=' . Requirement::normalizeDays($_POST['days'] ?? Requirement::DEFAULT_DAYS);
-
-        // 既存の行（一覧の入力欄）をまとめて更新する
-        foreach ((array)($_POST['plan_qty'] ?? []) as $productId => $qty) {
-            $productId = (int)$productId;
-            $qty       = (int)$qty;
-            if ($qty > 0) {
-                Db::exec(
-                    'INSERT INTO production_plans (target_date, product_id, qty, created_by)
-                     VALUES (?,?,?,?)
-                     ON DUPLICATE KEY UPDATE qty = VALUES(qty), updated_by = VALUES(created_by)',
-                    [$date, $productId, $qty, Auth::id()]
-                );
-            } else {
-                Db::exec('DELETE FROM production_plans WHERE target_date = ? AND product_id = ?', [$date, $productId]);
-            }
-        }
-
-        // 追加行（商品を選んで数を入れる）
-        $newProduct = (int)($_POST['new_product_id'] ?? 0);
-        $newQty     = (int)($_POST['new_qty'] ?? 0);
-        if ($newProduct > 0 && $newQty > 0) {
-            Db::exec(
-                'INSERT INTO production_plans (target_date, product_id, qty, created_by) VALUES (?,?,?,?)
-                 ON DUPLICATE KEY UPDATE qty = VALUES(qty), updated_by = VALUES(created_by)',
-                [$date, $newProduct, $newQty, Auth::id()]
-            );
-        }
-
-        OperationLog::write('update', 'production_plans', $date, Clock::dayLabel($date) . 'のつくる数を登録しました');
-        Session::flash('info', Clock::dayLabel($date) . 'のつくる数を登録しました。必要な材料を計算しなおしました。');
-        App::redirect($back);
     }
 
     /** 足りない材料を発注（未発注）に追加する。発注には対象期間（どの日ぶんか）を記録する */
@@ -127,7 +99,8 @@ class RequireController
         $date    = Clock::normalizeDate($_POST['date'] ?? null) ?? Clock::today();
         $days    = Requirement::normalizeDays($_POST['days'] ?? Requirement::DEFAULT_DAYS);
         $to      = Clock::rangeEnd($date, $days);
-        $back    = '/require?date=' . $date . '&days=' . $days;
+        $jobId   = (int)($_POST['job'] ?? 0) > 0 ? (int)$_POST['job'] : null;
+        $back    = $jobId !== null ? '/require?job=' . $jobId : '/require?date=' . $date . '&days=' . $days;
         $targets = array_map('intval', (array)($_POST['material_id'] ?? []));
         if ($targets === []) {
             Session::flash('warn', '発注に追加する材料を選んでください。');
@@ -135,7 +108,7 @@ class RequireController
         }
 
         $rows = array_filter(
-            Requirement::materials($date, $to),
+            Requirement::materials($date, $to, $jobId),
             static fn($r) => in_array((int)$r['id'], $targets, true)
                 && $r['order_qty'] !== null && (float)$r['order_qty'] > 0
         );
@@ -155,11 +128,11 @@ class RequireController
         foreach ($bySupplier as $supplierId => $items) {
             $orderId = Db::insert(
                 'INSERT INTO purchase_orders (order_no, company_id, supplier_id, delivery_place, status,
-                        order_date, period_from, period_to, desired_date, note, created_by)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                        order_date, period_from, period_to, job_id, desired_date, note, created_by)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                 [self::nextOrderNo(), $company['id'] ?? null, $supplierId, $company['delivery_place'] ?? null,
-                 'draft', Clock::today(), $date, $to, $date,
-                 Clock::dayLabel($date) . '〜' . Clock::dayLabel($to) . 'のつくる数から作成', Auth::id()]
+                 'draft', Clock::today(), $date, $to, $jobId, $date,
+                 Clock::dayLabel($date) . '〜' . Clock::dayLabel($to) . 'の発注（つくる予定）から作成', Auth::id()]
             );
             foreach ($items as $i => $row) {
                 Db::exec(

@@ -273,26 +273,54 @@ input[type=text],input[type=number],input[type=date],textarea,select{
 .carry{color:#8a6100; font-size:12px}
 
 /* スケジュール（週カレンダー） */
-.calendar{display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:6px}
-.cal-day{background:#fff; border:1px solid var(--line); border-radius:8px; min-height:220px; display:flex; flex-direction:column}
-.cal-day.weekend{background:#FAFAFA}
-.cal-day.today{border-color:var(--navy); box-shadow:0 0 0 2px rgba(20,50,100,.15)}
-.cal-head{display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--line)}
-.cal-head a{text-decoration:none; color:var(--navy)}
-.cal-date{font-size:20px; font-weight:bold}
-.cal-youbi{font-size:12px}
-.cal-day.today .badge{background:var(--navy); color:#fff}
-.cal-link{font-size:12px; border:1px solid var(--line); border-radius:4px; padding:1px 6px}
-.cal-sec{padding:6px 8px; font-size:13px}
-.cal-sec + .cal-sec{border-top:1px dashed var(--line); flex:1 1 auto}
-.cal-sec-title{font-size:11px; color:var(--gray); display:flex; justify-content:space-between; margin-bottom:3px}
-.cal-edit{font-size:11px}
-.cal-count{color:var(--navy)}
-.cal-empty{color:#BBB; font-size:12px}
-.cal-plan{padding:1px 0}
-.cal-part{padding:2px 0; line-height:1.4}
-.cal-part .flow-state{display:inline-block; margin-right:2px}
-.cal-form label{display:block; margin:2px 0}
-.cal-form select,.cal-form input{font-size:12px}
 .w-60{width:60px}
-@media (max-width:1100px){ .calendar{grid-template-columns:repeat(4, minmax(0,1fr))} }
+
+/* スケジュール（発注ごとのガントチャート） */
+.gantt-legend{font-size:12px; display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px}
+.gantt-legend .b{padding:3px 8px; min-width:0; width:auto}
+.gantt-wrap{overflow-x:auto; background:#fff; border:1px solid var(--line); border-radius:8px}
+.gantt{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; font-size:13px}
+.gantt th,.gantt td{border-bottom:1px solid var(--line); border-right:1px solid #EEF1F5; padding:4px 6px; vertical-align:middle}
+.gantt th.g-label,.gantt td.g-label{position:sticky; left:0; background:#fff; width:320px; min-width:320px; text-align:left; z-index:1; border-right:2px solid var(--line)}
+.gantt thead th{background:#F4F6FA; text-align:center; font-size:12px; line-height:1.2; padding:6px 2px}
+.gantt thead th.weekend{background:#EEF0F4; color:var(--gray)}
+.gantt thead th.today{background:#FFF3C4; color:#6b4a00}
+.gantt td.g-cell{height:30px; padding:2px 1px; text-align:center}
+.gantt td.g-cell.today{background:#FFFBEA}
+.gantt .g-head td{background:#F7F9FC; font-weight:bold}
+.gantt .g-head td.g-label{background:#F7F9FC}
+.gantt .g-head .g-cell{height:34px}
+.gantt tbody.g-closed .g-title{color:var(--gray)}
+.gantt tbody.collapsed .g-part,.gantt tbody.collapsed .g-po,.gantt tbody.collapsed .g-edit{display:none}
+.g-toggle{border:none; background:none; cursor:pointer; color:var(--navy); font-size:12px; padding:0 4px}
+.g-title{font-size:14px; color:var(--navy)}
+.g-sub{display:block; font-weight:normal; font-size:12px; color:var(--gray); margin-left:20px}
+.g-rate{display:block; font-weight:normal; font-size:12px; margin-left:20px; color:var(--navy)}
+.g-rate .bar{width:120px}
+.g-links{display:block; font-weight:normal; font-size:12px; margin-left:20px}
+.g-links a{margin-right:10px}
+.g-part .g-label{padding-left:26px}
+.g-part-name{font-weight:bold}
+.g-po .g-label{padding-left:26px; background:#FAF8FF}
+.g-po .g-label a{color:#5a3fa8}
+.g-late{background:var(--red-bg); color:var(--red)}
+.gantt .g-empty{padding:24px; text-align:center; color:var(--gray)}
+.b{display:inline-block; border-radius:4px; font-size:11px; line-height:1; padding:5px 4px; color:#fff; white-space:nowrap; text-decoration:none; box-sizing:border-box}
+.week-bar .btn{white-space:nowrap}
+.gantt td.g-cell .b{width:100%; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.b.plan{background:#9fb3d1; color:#123}
+.b.span{background:#E3E9F3; color:#E3E9F3; height:8px; padding:0; border-radius:0; margin-top:10px}
+.b.doing{background:#f0a83a; color:#3a2600}
+.b.done{background:#3a9d5d}
+.b.deliv{background:#1f3a5f}
+.b.deliv.light{background:#4a6a99}
+.b.po{background:#7a5cc4; border-radius:0}
+.b.po.st{border-radius:4px 0 0 4px} .b.po.en{border-radius:0 4px 4px 0} .b.po.st.en{border-radius:4px}
+.b.late{background:#d14b4b}
+.gantt-form{display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:13px}
+.gantt-form label{display:inline-flex; gap:4px; align-items:center}
+.gantt-form input,.gantt-form select{font-size:13px}
+.g-edit td{background:#FFFBEA}
+.g-inline{display:flex; gap:4px; align-items:center; flex-wrap:wrap; font-size:12px}
+.g-inline select,.g-inline input{font-size:12px}
+@media (max-width:1100px){ .gantt th.g-label,.gantt td.g-label{width:240px; min-width:240px} }

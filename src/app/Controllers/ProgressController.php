@@ -39,7 +39,7 @@ class ProgressController
             'prev_date' => Clock::shiftDays($date, -1),
             'next_date' => Clock::shiftDays($date, 1),
             'columns'   => $columns,
-            'has_plan'  => Requirement::plans($date, $date) !== [],
+            'has_plan'  => Requirement::parts($date) !== [],
         ]);
     }
 

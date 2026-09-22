@@ -51,8 +51,13 @@ $receivedCount = count(array_filter($items, fn($i) => (float)$i['received_qty'] 
       <?php if ($order['period_from'] || $order['period_to']): ?>
       <tr><th>対象の日</th><td colspan="3"><?= View::e(Clock::dayLabel($order['period_from'] ?? $order['period_to'])) ?>
         <?php if ($order['period_to'] && $order['period_to'] !== $order['period_from']): ?> 〜 <?= View::e(Clock::dayLabel($order['period_to'])) ?><?php endif; ?>
-        のつくる数から作成
-        <a href="<?= View::e(App::url('/require?date=' . ($order['period_from'] ?? $order['period_to']))) ?>">必要な材料を見る</a></td></tr>
+        のぶん
+        <?php if (!empty($order['job_id'])): ?>
+          <a href="<?= View::e(App::url('/require?job=' . (int)$order['job_id'])) ?>">この発注（つくる予定）の必要な材料を見る</a>
+          ／<a href="<?= View::e(App::url('/schedule?from=' . Clock::weekStart($order['period_from'] ?? $order['period_to']))) ?>">スケジュールで見る</a>
+        <?php else: ?>
+          <a href="<?= View::e(App::url('/require?date=' . ($order['period_from'] ?? $order['period_to']))) ?>">必要な材料を見る</a>
+        <?php endif; ?></td></tr>
       <?php endif; ?>
       <tr><th>備考</th><td colspan="3"><input type="text" name="note" value="<?= View::e($order['note']) ?>" class="w-400" <?= $editable ? '' : 'readonly' ?>></td></tr>
     </tbody>

@@ -10,7 +10,7 @@ $title = 'ホーム';
 <div class="card-grid">
   <a class="card" href="<?= View::e(App::url('/require')) ?>">
     <div class="card-head">🧮 必要な材料と足りない分</div>
-    <div class="card-body">今週つくる数を入れると、材料が何をどれだけ買えばよいかがわかります。</div>
+    <div class="card-body">スケジュールで登録した発注（つくる予定）から、材料が何をどれだけ買えばよいかがわかります。</div>
   </a>
   <a class="card" href="<?= View::e(App::url('/orders')) ?>">
     <div class="card-head">📨 発注の管理</div>

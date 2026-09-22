@@ -7,13 +7,17 @@ use App\Core\View;
 use App\Services\Requirement;
 $title = '必要な材料と足りない分';
 $judgeClass = ['short' => 'judge-short', 'tight' => 'judge-tight', 'ok' => 'judge-ok', 'exempt' => 'judge-exempt'];
-$plannedIds = array_column($plans, 'product_id');
 $showDays   = $days <= 7;   // 日ごとの列は7日までのとき出す（それ以上は合計だけ）
-$q = fn(string $d) => '/require?date=' . $d . '&days=' . $days;
+$q = fn(string $d) => $job !== null ? '/require?job=' . (int)$job['id'] : '/require?date=' . $d . '&days=' . $days;
 ?>
 <h1 class="page-title">必要な材料と足りない分</h1>
-<p class="page-lead">開始日から「先読み期間」ぶんのつくる数をまとめて、材料が何をどれだけ買えばよいかを出します。日ごとのつくる数は
-  <a href="<?= View::e(App::url('/schedule?week=' . Clock::weekStart($date))) ?>">スケジュール</a>でも入れられます。</p>
+<?php if ($job !== null): ?>
+<p class="page-lead">発注「<?= View::e($job['customer_name'] ?: '得意先なし') ?>　<?= View::e($job['product_name']) ?> <?= (int)$job['qty'] ?>台（納品 <?= View::e(Clock::dayLabel($job['delivery_date'])) ?>）」1件ぶんの必要な材料です。
+  <a href="<?= View::e(App::url('/schedule?from=' . Clock::weekStart($date))) ?>">スケジュール</a>に戻る／
+  <a href="<?= View::e(App::url('/require?date=' . $date)) ?>">期間全体で見る</a></p>
+<?php else: ?>
+<p class="page-lead">開始日から「先読み期間」ぶんの発注（つくる予定）をまとめて、材料が何をどれだけ買えばよいかを出します。発注の登録や仕込み日の調整は
+  <a href="<?= View::e(App::url('/schedule?from=' . Clock::weekStart($date))) ?>">スケジュール</a>で行います。</p>
 
 <form method="get" action="<?= View::e(App::url('/require')) ?>" class="week-bar">
   <a class="btn btn-plain" href="<?= View::e(App::url($q($prev_date))) ?>">← 前の日</a>
@@ -30,63 +34,30 @@ $q = fn(string $d) => '/require?date=' . $d . '&days=' . $days;
     <button class="btn btn-plain">表示する</button>
   </span>
 </form>
-
-<h2 class="sec-title" id="plan">① <?= View::e(Clock::dayLabel($date)) ?> につくる数</h2>
-<form method="post" action="<?= View::e(App::url('/require/plan')) ?>" class="box">
-  <?= Csrf::field() ?>
-  <input type="hidden" name="date" value="<?= View::e($date) ?>">
-  <input type="hidden" name="days" value="<?= (int)$days ?>">
-  <table class="table table-narrow">
-    <thead><tr><th>商品</th><th class="num">つくる数（台）</th></tr></thead>
-    <tbody>
-    <?php foreach ($plans as $pl): ?>
-      <tr>
-        <td><?= View::e($pl['name']) ?><?= $pl['spec'] ? '（' . View::e($pl['spec']) . '）' : '' ?></td>
-        <td class="num"><input type="number" name="plan_qty[<?= (int)$pl['product_id'] ?>]"
-               value="<?= (int)$pl['qty'] ?>" class="w-100" min="0"></td>
-      </tr>
-    <?php endforeach; ?>
-      <tr>
-        <td>
-          <select name="new_product_id">
-            <option value="">-- 商品を追加する --</option>
-            <?php foreach ($products as $p): ?>
-              <?php if (in_array($p['id'], $plannedIds)) { continue; } ?>
-              <option value="<?= (int)$p['id'] ?>"><?= View::e($p['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </td>
-        <td class="num"><input type="number" name="new_qty" class="w-100" min="0" placeholder="台数"></td>
-      </tr>
-    </tbody>
-  </table>
-  <?php if (Auth::can('require')): ?>
-    <button class="btn">この数で計算する</button>
-  <?php else: ?>
-    <p class="note">※ つくる数を変更できるのは管理者と発注担当です。</p>
-  <?php endif; ?>
-</form>
-
-<?php if ($days > 1): ?>
-<table class="table table-narrow">
-  <thead><tr><th>日</th><th>この期間につくる数（他の日）</th></tr></thead>
-  <tbody>
-  <?php foreach ($day_list as $d): if ($d === $date) { continue; } ?>
-    <tr>
-      <td><a href="<?= View::e(App::url($q($d))) ?>"><?= View::e(Clock::dayLabel($d)) ?></a></td>
-      <td><?php if (empty($plans_by_day[$d])): ?><span class="note">なし</span><?php else: ?>
-        <?php foreach ($plans_by_day[$d] as $pl): ?>
-          <span class="chip"><?= View::e($pl['name']) ?> <?= (int)$pl['qty'] ?>台</span>
-        <?php endforeach; ?>
-      <?php endif; ?></td>
-    </tr>
-  <?php endforeach; ?>
-  </tbody>
-</table>
 <?php endif; ?>
 
-<?php if ($plans_by_day === []): ?>
-  <p class="alert alert-warn">この期間のつくる数がまだ入っていません。上の欄に台数を入れて「この数で計算する」を押してください。</p>
+<h2 class="sec-title" id="plan">① この期間に仕上げる発注（つくる予定）</h2>
+<table class="table table-narrow">
+  <thead><tr><th>仕上げ日</th><th>得意先</th><th>商品</th><th class="num">台数</th><th>納品日</th><th></th></tr></thead>
+  <tbody>
+  <?php foreach ($day_list as $d): foreach ($plans_by_day[$d] ?? [] as $pl): ?>
+    <tr>
+      <td><?= View::e(Clock::dayLabel($d)) ?></td>
+      <td><?= View::e($pl['customer_name'] ?: '-') ?></td>
+      <td><?= View::e($pl['name']) ?><?= $pl['spec'] ? '（' . View::e($pl['spec']) . '）' : '' ?></td>
+      <td class="num"><?= (int)$pl['qty'] ?>台</td>
+      <td><?= View::e(Clock::dayLabel($pl['delivery_date'])) ?></td>
+      <td><?php if ($job === null): ?><a href="<?= View::e(App::url('/require?job=' . (int)$pl['id'])) ?>">この発注だけ見る</a><?php endif; ?></td>
+    </tr>
+  <?php endforeach; endforeach; ?>
+  <?php if ($plans_by_day === []): ?>
+    <tr><td colspan="6" class="note">この期間に仕上げる発注はありません（仕込みだけの日は②に出ます）。</td></tr>
+  <?php endif; ?>
+  </tbody>
+</table>
+
+<?php if (!$has_data): ?>
+  <p class="alert alert-warn">この期間の発注（つくる予定）がまだありません。<a href="<?= View::e(App::url('/schedule')) ?>">スケジュール</a>で発注を追加してください。</p>
 <?php else: ?>
 
 <h2 class="sec-title" id="batch">② 仕込み（バッチ）の回数</h2>
@@ -128,6 +99,7 @@ $q = fn(string $d) => '/require?date=' . $d . '&days=' . $days;
   <?= Csrf::field() ?>
   <input type="hidden" name="date" value="<?= View::e($date) ?>">
   <input type="hidden" name="days" value="<?= (int)$days ?>">
+  <?php if ($job !== null): ?><input type="hidden" name="job" value="<?= (int)$job['id'] ?>"><?php endif; ?>
   <table class="table">
     <thead>
       <tr>
@@ -170,7 +142,7 @@ $q = fn(string $d) => '/require?date=' . $d . '&days=' . $days;
 
   <?php if (Auth::can('order')): ?>
     <p><button class="btn">チェックした材料を発注（未発注）に追加する</button>
-       <span class="note">仕入先ごとに1件の発注をつくります。発注には「<?= View::e(Clock::dayLabel($date)) ?>〜<?= View::e(Clock::dayLabel($to)) ?>のぶん」と記録されます。</span></p>
+       <span class="note">仕入先ごとに1件の発注をつくります。発注には「<?= View::e(Clock::dayLabel($date)) ?>〜<?= View::e(Clock::dayLabel($to)) ?>のぶん」<?= $job !== null ? 'と、どの発注（つくる予定）のぶんか' : '' ?>が記録され、スケジュールの「材料の発注」行に出ます。</span></p>
   <?php endif; ?>
 </form>
 <?php endif; ?>
