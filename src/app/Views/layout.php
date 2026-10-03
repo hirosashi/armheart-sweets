@@ -19,6 +19,7 @@ $menuSetup = [
     ['label' => '商品と配合', 'path' => '/products'],
     ['label' => '部位の登録', 'path' => '/parts'],
     ['label' => '材料の一覧', 'path' => '/materials'],
+    ['label' => 'Excelで取り込み・書き出し', 'path' => '/master-io'],
 ];
 
 $current  = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';

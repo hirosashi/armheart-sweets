@@ -8,6 +8,7 @@ use App\Core\Auth;
 use App\Core\Router;
 use App\Controllers\AuthController;
 use App\Controllers\HomeController;
+use App\Controllers\MasterIoController;
 use App\Controllers\MaterialController;
 use App\Controllers\OrderController;
 use App\Controllers\PartController;
@@ -77,12 +78,17 @@ $router->get('/materials',       [MaterialController::class, 'index']);
 $router->get('/materials/edit',  [MaterialController::class, 'edit']);
 $router->post('/materials/save', [MaterialController::class, 'save']);
 
+// Excelで取り込み・書き出し（材料・仕入先・部位・商品と配合）
+$router->get('/master-io',         [MasterIoController::class, 'index']);
+$router->get('/master-io/export',  [MasterIoController::class, 'export']);
+$router->post('/master-io/import', [MasterIoController::class, 'import']);
+
 try {
     $router->dispatch();
 } catch (Throwable $e) {
     error_log($e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
-    App\Core\View::render('error', [
+    \App\Core\View::render('error', [
         'title'   => 'エラーが発生しました',
         'message' => App::config('debug')
             ? $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')'
