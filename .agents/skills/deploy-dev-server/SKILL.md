@@ -7,7 +7,7 @@ description: 開発サーバ（さくら jyunbi.sakura.ne.jp/armheart.com）へ 
 
 ## 前提
 - プロジェクト: `/home/ubuntu/phase1_dev`
-- 反映スクリプト: `deploy.sh`（`src/` を tar→scp→ssh で展開。`config.local.php`・`install.php`・ログは除外）
+- 反映スクリプト: `deploy.sh`（`src/` を tar→scp→ssh で展開。環境別設定 `config.local/sakura/production.php`・`install.php`・ログは除外）
 - SFTP: host `jyunbi.sakura.ne.jp` / port 22 / user `jyunbi` / 配置先 `/home/jyunbi/www/armheart.com`
 - パスワードは組織 secret **`ARMHEART_SFTP_PASS`**（exec の `env` に `secret:session:ARMHEART_SFTP_PASS` で束縛）。添付「開発環境.txt」の値は古く認証に失敗する。値を会話・ログ・ソースに出力しないこと。
 - 確認URLは `https://jyunbi.sakura.ne.jp/armheart.com/`（`sakura.jp` は名前解決不可）
@@ -39,4 +39,5 @@ description: 開発サーバ（さくら jyunbi.sakura.ne.jp/armheart.com）へ 
 
 ## 注意
 - `.htaccess`（`src/.htaccess`, `src/app/.htaccess`）は削除・除外しない（内部フォルダ保護）。
-- `config/config.sakura.php` は開発サーバ側に既にあるもの。上書きしてよいが、内容を会話に出さない。
+- `config/config.sakura.php` は開発サーバ側に置いてあるものが使われる（`deploy.sh` は転送しない）。内容を会話に出さない。
+- 本番への反映は `deploy-prod-server` スキル（`./deploy.sh prod`）。
