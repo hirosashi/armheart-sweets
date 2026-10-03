@@ -9,6 +9,7 @@ use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
+use App\Services\MasterDelete;
 
 class PartController
 {
@@ -62,6 +63,7 @@ class PartController
             'part'      => $part,
             'materials' => $materials,
             'products'  => $products,
+            'usages'    => MasterDelete::usages('part', $id),
             'qty_sum'   => array_sum(array_map(static fn($r) => (float)$r['qty'], $materials)),
         ]);
     }
@@ -107,6 +109,33 @@ class PartController
         }
 
         App::redirect('/parts/show?id=' . $id);
+    }
+
+    /** 部位の削除（使われているものは消さない） */
+    public static function delete(): void
+    {
+        Auth::requireLogin();
+        Csrf::verify();
+        if (!Auth::can('parts')) {
+            Session::flash('warn', 'この操作をする権限がありません。');
+            App::redirect('/parts');
+        }
+
+        $id  = (int)($_POST['id'] ?? 0);
+        $row = Db::one('SELECT name FROM parts WHERE id = ? AND deleted_at IS NULL', [$id]);
+        if (!$row) {
+            App::redirect('/parts');
+        }
+
+        $usages = MasterDelete::delete('part', $id);
+        if ($usages !== []) {
+            Session::flash('warn', 'まだ使われているため削除できません：' . implode('／', $usages));
+            App::redirect('/parts/show?id=' . $id);
+        }
+
+        OperationLog::write('delete', 'parts', (string)$id, '部位を削除しました：' . $row['name']);
+        Session::flash('info', '「' . $row['name'] . '」を削除しました。');
+        App::redirect('/parts');
     }
 
     /** 配合（1バッチの材料と配合量）の追加・修正・削除 */

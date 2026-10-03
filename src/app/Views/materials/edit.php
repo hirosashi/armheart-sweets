@@ -59,3 +59,8 @@ $kind = $material['kind'] ?? 'material';
     <a class="btn btn-plain" href="<?= View::e(App::url('/materials')) ?>">やめる</a>
   </div>
 </form>
+
+<?php if (!$isNew):
+    $deleteAction = '/materials/delete'; $deleteId = (int)$material['id']; $deleteLabel = 'この材料';
+    require __DIR__ . '/../_parts/delete_box.php';
+endif; ?>

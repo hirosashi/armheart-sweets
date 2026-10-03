@@ -9,6 +9,7 @@ use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
+use App\Services\MasterDelete;
 
 class ProductController
 {
@@ -81,7 +82,10 @@ class ProductController
             ? Db::one('SELECT * FROM products WHERE id = ? AND deleted_at IS NULL', [$id])
             : null;
 
-        View::render('products/edit', ['product' => $product]);
+        View::render('products/edit', [
+            'product' => $product,
+            'usages'  => $product ? MasterDelete::usages('product', $id) : [],
+        ]);
     }
 
     /** 商品の保存 */
@@ -134,6 +138,33 @@ class ProductController
         }
 
         App::redirect('/products/show?id=' . $id);
+    }
+
+    /** 商品の削除（使われているものは消さない） */
+    public static function delete(): void
+    {
+        Auth::requireLogin();
+        Csrf::verify();
+        if (!Auth::can('recipe')) {
+            Session::flash('warn', 'この操作は管理者だけができます。');
+            App::redirect('/products');
+        }
+
+        $id  = (int)($_POST['id'] ?? 0);
+        $row = Db::one('SELECT name FROM products WHERE id = ? AND deleted_at IS NULL', [$id]);
+        if (!$row) {
+            App::redirect('/products');
+        }
+
+        $usages = MasterDelete::delete('product', $id);
+        if ($usages !== []) {
+            Session::flash('warn', 'まだ使われているため削除できません：' . implode('／', $usages));
+            App::redirect('/products/edit?id=' . $id);
+        }
+
+        OperationLog::write('delete', 'products', (string)$id, '商品を削除しました：' . $row['name']);
+        Session::flash('info', '「' . $row['name'] . '」を削除しました。');
+        App::redirect('/products');
     }
 
     /** 商品に使う部位の追加・修正・削除 */

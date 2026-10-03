@@ -37,6 +37,7 @@ $router->get('/products',           [ProductController::class, 'index']);
 $router->get('/products/show',      [ProductController::class, 'show']);
 $router->get('/products/edit',      [ProductController::class, 'edit']);
 $router->post('/products/save',     [ProductController::class, 'save']);
+$router->post('/products/delete',   [ProductController::class, 'delete']);
 $router->post('/products/part',     [ProductController::class, 'savePart']);
 $router->post('/products/material', [ProductController::class, 'saveMaterial']);
 
@@ -44,6 +45,7 @@ $router->post('/products/material', [ProductController::class, 'saveMaterial']);
 $router->get('/parts',           [PartController::class, 'index']);
 $router->get('/parts/show',      [PartController::class, 'show']);
 $router->post('/parts/save',     [PartController::class, 'save']);
+$router->post('/parts/delete',   [PartController::class, 'delete']);
 $router->post('/parts/material', [PartController::class, 'saveMaterial']);
 
 // スケジュール（発注ごとのガントチャート）
@@ -77,6 +79,7 @@ $router->post('/stock/adjust', [StockController::class, 'adjust']);
 $router->get('/materials',       [MaterialController::class, 'index']);
 $router->get('/materials/edit',  [MaterialController::class, 'edit']);
 $router->post('/materials/save', [MaterialController::class, 'save']);
+$router->post('/materials/delete', [MaterialController::class, 'delete']);
 
 // Excelで取り込み・書き出し（材料・仕入先・部位・商品と配合）
 $router->get('/master-io',         [MasterIoController::class, 'index']);

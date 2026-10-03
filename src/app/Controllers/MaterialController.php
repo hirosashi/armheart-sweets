@@ -9,6 +9,7 @@ use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
+use App\Services\MasterDelete;
 
 class MaterialController
 {
@@ -76,6 +77,7 @@ class MaterialController
 
         View::render('materials/edit', [
             'material'  => $material,
+            'usages'    => $material ? MasterDelete::usages('material', $id) : [],
             'suppliers' => Db::all(
                 "SELECT id, name FROM suppliers
                   WHERE deleted_at IS NULL AND supplier_type IN ('purchase','both')
@@ -149,6 +151,33 @@ class MaterialController
         }
 
         App::redirect('/materials?q=' . urlencode((string)$data['name']));
+    }
+
+    /** 材料の削除（使われているものは消さない） */
+    public static function delete(): void
+    {
+        Auth::requireLogin();
+        Csrf::verify();
+        if (!Auth::can('material')) {
+            Session::flash('warn', 'この操作をする権限がありません。');
+            App::redirect('/materials');
+        }
+
+        $id  = (int)($_POST['id'] ?? 0);
+        $row = Db::one('SELECT name FROM materials WHERE id = ? AND deleted_at IS NULL', [$id]);
+        if (!$row) {
+            App::redirect('/materials');
+        }
+
+        $usages = MasterDelete::delete('material', $id);
+        if ($usages !== []) {
+            Session::flash('warn', 'まだ使われているため削除できません：' . implode('／', $usages));
+            App::redirect('/materials/edit?id=' . $id);
+        }
+
+        OperationLog::write('delete', 'materials', (string)$id, '材料を削除しました：' . $row['name']);
+        Session::flash('info', '「' . $row['name'] . '」を削除しました。');
+        App::redirect('/materials');
     }
 
     /** 入力欄の選択肢用（材料の一覧） */
