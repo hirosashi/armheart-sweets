@@ -50,7 +50,7 @@ tar czf /tmp/deploy.tgz \
   .
 
 export SSHPASS="$PASS"
-SSH_OPTS="-o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no"
+SSH_OPTS="-o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no"
 sshpass -e scp $SSH_OPTS /tmp/deploy.tgz "$USER@$HOST:/tmp/deploy.tgz"
 sshpass -e ssh $SSH_OPTS "$USER@$HOST" \
   "/bin/sh -c 'test -f $DEST/$KEEP_CONFIG || { echo \"$DEST/$KEEP_CONFIG がありません\" >&2; exit 1; }; mkdir -p $DEST/storage/logs && cd $DEST && tar xzf /tmp/deploy.tgz${AFTER} && rm -f /tmp/deploy.tgz && chmod -R 755 $DEST && chmod 600 $DEST/$KEEP_CONFIG && chmod -R 777 $DEST/storage/logs && ls -la $DEST'"

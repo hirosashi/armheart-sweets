@@ -8,6 +8,8 @@ use ZipArchive;
 class Xlsx
 {
     private const NS_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    /** 展開後に読む1ファイルの上限（圧縮で小さく見せた巨大なXMLを読まない） */
+    private const MAX_XML_BYTES = 50 * 1024 * 1024;
 
     /**
      * シートごとの行を .xlsx に書き出し、作った一時ファイルのパスを返す。
@@ -224,7 +226,14 @@ class Xlsx
 
     private static function xml(ZipArchive $zip, string $name): ?SimpleXMLElement
     {
-        $data = $zip->getFromName($name);
+        $stat = $zip->statName($name);
+        if ($stat === false) {
+            return null;
+        }
+        if ($stat['size'] > self::MAX_XML_BYTES) {
+            throw new \RuntimeException('Excelファイルの中身が大きすぎて読めません。');
+        }
+        $data = $zip->getFromName($name, self::MAX_XML_BYTES);
         if ($data === false) {
             return null;
         }
