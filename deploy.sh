@@ -20,6 +20,7 @@ case "$TARGET" in
     : "${SFTP_PASS:?SFTP_PASS を環境変数で渡してください}"
     PASS="$SFTP_PASS"
     KEEP_CONFIG="config/config.sakura.php"
+    AFTER=""
     ;;
   prod)
     HOST="smileyou-plus.sakura.ne.jp"
@@ -30,6 +31,8 @@ case "$TARGET" in
     URL="https://armheart.com/system/"
     PASS="$PROD_SSH_PASS"
     KEEP_CONFIG="config/config.production.php"
+    # ベーシック認証。設定はサーバのホーム直下（Git管理外）にあり、反映で上書きされた .htaccess に付け直す
+    AFTER=" && { test ! -f /home/smileyou-plus/system_basic_auth.htaccess || cat /home/smileyou-plus/system_basic_auth.htaccess >> $DEST/.htaccess; }"
     ;;
   *)
     echo "使い方: ./deploy.sh [dev|prod]" >&2
@@ -50,6 +53,6 @@ export SSHPASS="$PASS"
 SSH_OPTS="-o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no"
 sshpass -e scp $SSH_OPTS /tmp/deploy.tgz "$USER@$HOST:/tmp/deploy.tgz"
 sshpass -e ssh $SSH_OPTS "$USER@$HOST" \
-  "/bin/sh -c 'test -f $DEST/$KEEP_CONFIG || { echo \"$DEST/$KEEP_CONFIG がありません\" >&2; exit 1; }; mkdir -p $DEST/storage/logs && cd $DEST && tar xzf /tmp/deploy.tgz && rm -f /tmp/deploy.tgz && chmod -R 755 $DEST && chmod 600 $DEST/$KEEP_CONFIG && chmod -R 777 $DEST/storage/logs && ls -la $DEST'"
+  "/bin/sh -c 'test -f $DEST/$KEEP_CONFIG || { echo \"$DEST/$KEEP_CONFIG がありません\" >&2; exit 1; }; mkdir -p $DEST/storage/logs && cd $DEST && tar xzf /tmp/deploy.tgz${AFTER} && rm -f /tmp/deploy.tgz && chmod -R 755 $DEST && chmod 600 $DEST/$KEEP_CONFIG && chmod -R 777 $DEST/storage/logs && ls -la $DEST'"
 rm -f /tmp/deploy.tgz
 echo "反映が完了しました: $URL"

@@ -13,6 +13,7 @@ description: 本番（公開）サーバ（さくら smileyou-plus.sakura.ne.jp 
   - `ARMHEART_PROD_DB_PASS`（DB: host `mysql2105.db.sakura.ne.jp` / DB名・ユーザー `smileyou-plus_sys` / MySQL 8.0）
 - サーバのログインシェルは csh。複数コマンドは `ssh ... /bin/sh <<'EOF' ... EOF` で sh に渡す（`2>&1` 等は csh だとエラー）。
 - 本番は PHP 8.3。設定は `config/config.production.php`（サーバにだけ置く。git管理外、`deploy.sh` は転送しない）。このファイルがあると `config.php` は必ずこれを読む。`debug` は false。
+- 公開にはベーシック認証がかかっている（ユーザー `armheart`、パスワードはユーザーに伝えた値。`/home/smileyou-plus/.htpasswd_system`、設定は `/home/smileyou-plus/system_basic_auth.htaccess`）。`deploy.sh prod` が反映のたびに `.htaccess` の末尾へ付け直す。curl 確認では `-u armheart:<パスワード>` を付ける（付けないと全URLが401）。
 - さくらの「国外IPアドレスフィルタ」がONだと、海外IPのDevinからは SSH が `Permission denied`、FTPは切断になる（許可IPリストはウェブにしか効かない）。拒否されたらまずフィルタ状態をユーザーに確認する。
 
 ## 手順
@@ -31,7 +32,7 @@ description: 本番（公開）サーバ（さくら smileyou-plus.sakura.ne.jp 
    # env: {"PROD_SSH_USER":"secret:session:ARMHEART_PROD_SSH_USER","PROD_SSH_PASS":"secret:session:ARMHEART_PROD_SSH_PASS"}
    cd /home/ubuntu/phase1_dev && ./deploy.sh prod
    ```
-4. 確認: 未ログイン `/` → 302、`/login` → 200、`/config/config.production.php`・`/db/`・`/storage/logs/` → 403。ログイン後 `/ /schedule /materials /parts /products /require /progress /orders /stock` が 200 で warning/fatal なし（ログイン手順は `deploy-dev-server` と同じ。admin のパスワードはユーザー提供の本番用の値）。
+4. 確認: 認証なし `/login` → 401。以下はベーシック認証つきで、未ログイン `/` → 302、`/login` → 200、`/config/config.production.php`・`/db/`・`/storage/logs/` → 403。ログイン後 `/ /schedule /materials /parts /products /require /progress /orders /stock` が 200 で warning/fatal なし（ログイン手順は `deploy-dev-server` と同じ。admin のパスワードはユーザー提供の本番用の値）。
 
 ## 本番データの扱い
 - 初回移植時はマスタ（users・companies・suppliers・materials・parts・part_materials・products・product_parts・product_materials）だけを開発DBからコピーし、在庫・発注・進捗・案件・ログは空で開始した。
