@@ -4,6 +4,7 @@ use App\Core\Auth;
 use App\Core\Clock;
 use App\Core\View;
 use App\Services\Flow;
+use App\Services\JobTree;
 
 // 日々の作業で使う画面（いつも出しておく）
 $menuWork = [
@@ -44,6 +45,17 @@ if (Auth::check()) {
     }
 }
 $flowDone = Flow::summary($flowSteps);
+
+$tree = [];
+$treeError = false;
+if (Auth::check()) {
+    try {
+        $tree = JobTree::build();
+    } catch (\Throwable $e) {
+        $treeError = true;
+    }
+}
+$here = (string)($_SERVER['REQUEST_URI'] ?? '');
 
 // 工程のリンク。どの工程から来たかを step で持たせ、押した工程だけを強調する
 $flowStep = (int)($_GET['step'] ?? 0);
@@ -96,8 +108,21 @@ $flowHref = static function (array $step): string {
 
 <div class="layout">
   <nav class="sidemenu">
+    <?php if (Auth::check()): ?>
+      <div class="side-tabs" role="tablist">
+        <button type="button" class="side-tab active" data-tab="tree">発注ごと</button>
+        <button type="button" class="side-tab" data-tab="flow">業務の流れ</button>
+      </div>
+      <div class="side-pane" data-pane="tree">
+        <?php if ($treeError): ?>
+          <div class="tree-empty">発注ごとの表示を作れませんでした。</div>
+        <?php else: ?>
+          <?php require __DIR__ . '/_parts/job_tree.php'; ?>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
     <?php if ($flowSteps !== []): ?>
-      <div class="flow">
+      <div class="flow side-pane" data-pane="flow" hidden>
         <div class="flow-head">
           業務の進み具合
           <span class="flow-week"><?= View::e(Clock::dayLabel($flowDate)) ?>　<?= (int)$flowDone['done'] ?>/<?= (int)$flowDone['total'] ?>済</span>

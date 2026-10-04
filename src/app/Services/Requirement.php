@@ -9,8 +9,8 @@ use App\Core\Db;
  *   1台あたり実使用量 = 充填量 ÷ 取り数 × 1台に使う個数
  *   必要バッチ数     = 台数 × 1台あたり実使用量 ÷ 歩留まり ÷ バッチ合計量（既定は切り上げ）
  *   材料の必要量     = 必要バッチ数 × バッチ配合量
- * 仕込みの回数は「発注（jobs）」ごとに部位を日へ割り振った job_parts が正本。期間の合計はその和とする。
- * 商品用資材（product_materials）は発注の仕上げ日（jobs.finish_date）に使う。
+ * 仕込みの回数は発注で作る商品（job_items）ごとに部位を日へ割り振った job_parts が正本。期間の合計はその和とする。
+ * 商品用資材（product_materials）は商品の仕上げ日（job_items.finish_date）に使う。
  * 期間は from〜to（両端を含む）。1日ぶんは from = to で指定する。$jobId を渡すと1件の発注に絞る。
  */
 class Requirement
@@ -38,18 +38,19 @@ class Requirement
             : [' ', []];
     }
 
-    /** 期間に仕上げる発注（日付・商品ごと。target_date ＝ 仕上げ日） */
+    /** 期間に仕上げる商品（発注の商品ごと。target_date ＝ 仕上げ日） */
     public static function plans(string $from, string $to, ?int $jobId = null): array
     {
         $w = $jobId !== null ? ' AND j.id = ? ' : ' ';
         $p = $jobId !== null ? [$jobId] : [];
         return Db::all(
-            "SELECT j.id, j.finish_date AS target_date, j.delivery_date, j.customer_name,
-                    j.product_id, j.qty, p.name, p.spec, j.status
-               FROM jobs j
-               JOIN products p ON p.id = j.product_id
-              WHERE j.status IN ('open','done') AND j.finish_date BETWEEN ? AND ? AND p.deleted_at IS NULL $w
-              ORDER BY j.finish_date, p.name, j.id",
+            "SELECT j.id, ji.id AS item_id, ji.finish_date AS target_date, j.delivery_date, j.customer_name, j.title,
+                    ji.product_id, ji.qty, p.name, p.spec, j.status
+               FROM job_items ji
+               JOIN jobs j ON j.id = ji.job_id
+               JOIN products p ON p.id = ji.product_id
+              WHERE j.status IN ('open','done') AND ji.finish_date BETWEEN ? AND ? AND p.deleted_at IS NULL $w
+              ORDER BY ji.finish_date, p.name, j.id, ji.id",
             array_merge([$from, $to], $p)
         );
     }
@@ -101,7 +102,7 @@ class Requirement
     /**
      * 期間の材料必要量を材料単位で集計する共通CTE。
      * 部位の配合 … job_parts の回数 × バッチ配合量（仕込む日）
-     * 商品用資材 … 発注の台数 × 1台あたり量（仕上げ日）
+     * 商品用資材 … 発注の商品の台数 × 1台あたり量（仕上げ日）
      */
     private static function needSql(?int $jobId): string
     {
@@ -117,11 +118,12 @@ WITH need AS (
    WHERE jp.target_date BETWEEN :from1 AND :to1 $w
    GROUP BY jp.target_date, pm.material_id
   UNION ALL
-  SELECT j.finish_date, prm.material_id, SUM(j.qty * prm.qty)
-    FROM jobs j
-    JOIN product_materials prm ON prm.product_id = j.product_id
-   WHERE j.status IN ('open','done') AND j.finish_date BETWEEN :from2 AND :to2 $w2
-   GROUP BY j.finish_date, prm.material_id
+  SELECT ji.finish_date, prm.material_id, SUM(ji.qty * prm.qty)
+    FROM job_items ji
+    JOIN jobs j ON j.id = ji.job_id AND j.status IN ('open','done')
+    JOIN product_materials prm ON prm.product_id = ji.product_id
+   WHERE ji.finish_date BETWEEN :from2 AND :to2 $w2
+   GROUP BY ji.finish_date, prm.material_id
 )
 SQL;
     }

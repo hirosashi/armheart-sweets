@@ -150,12 +150,13 @@ class Flow
         $to   = Clock::rangeEnd($date, $days);
 
         $planToday  = (int)Db::value(
-            "SELECT COUNT(*) FROM jobs WHERE status = 'open' AND finish_date = ?",
+            "SELECT COUNT(DISTINCT j.id) FROM jobs j JOIN job_items ji ON ji.job_id = j.id
+              WHERE j.status = 'open' AND ji.finish_date = ?",
             [$date]
         );
         $planPeriod = (int)Db::value(
             "SELECT COUNT(*) FROM jobs j WHERE j.status IN ('open','done')
-               AND (j.finish_date BETWEEN ? AND ?
+               AND (EXISTS (SELECT 1 FROM job_items ji WHERE ji.job_id = j.id AND ji.finish_date BETWEEN ? AND ?)
                     OR EXISTS (SELECT 1 FROM job_parts jp WHERE jp.job_id = j.id AND jp.target_date BETWEEN ? AND ?))",
             [$date, $to, $date, $to]
         );
@@ -225,13 +226,15 @@ class Flow
     {
         $out  = [];
         $jobs = Jobs::open(8);
-        $rows = Jobs::partRows(array_map(fn($j) => (int)$j['id'], $jobs));
+        $ids   = array_map(fn($j) => (int)$j['id'], $jobs);
+        $rows  = Jobs::partRows($ids);
+        $items = Jobs::items($ids);
         foreach ($jobs as $j) {
             $ach = Jobs::achievement($rows[(int)$j['id']] ?? []);
             $out[] = [
                 'group'  => self::GROUP_JOBS,
-                'label'  => ($j['customer_name'] ? $j['customer_name'] . '　' : '') . $j['product_name'] . ' ' . $j['qty'] . '台',
-                'path'   => '/schedule?from=' . Clock::weekStart($j['delivery_date']),
+                'label'  => Jobs::label($j) . '　' . Jobs::itemSummary($items[(int)$j['id']] ?? []),
+                'path'   => '/schedule?job=' . (int)$j['id'],
                 'state'  => self::state($ach['total'] > 0 && $ach['done'] >= $ach['total'], $ach['done'] > 0 || $ach['doing'] > 0),
                 'detail' => '納品 ' . Clock::dayLabel($j['delivery_date']) . '　仕込み ' . $ach['done'] . '／' . $ach['total'] . '部位',
                 'rate'   => $ach['rate'],

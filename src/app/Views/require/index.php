@@ -4,6 +4,7 @@ use App\Core\Auth;
 use App\Core\Clock;
 use App\Core\Csrf;
 use App\Core\View;
+use App\Services\Jobs;
 use App\Services\Requirement;
 $title = '必要な材料と足りない分';
 $judgeClass = ['short' => 'judge-short', 'tight' => 'judge-tight', 'ok' => 'judge-ok', 'exempt' => 'judge-exempt'];
@@ -12,8 +13,8 @@ $q = fn(string $d) => $job !== null ? '/require?job=' . (int)$job['id'] : '/requ
 ?>
 <h1 class="page-title">必要な材料と足りない分</h1>
 <?php if ($job !== null): ?>
-<p class="page-lead">発注「<?= View::e($job['customer_name'] ?: '得意先なし') ?>　<?= View::e($job['product_name']) ?> <?= (int)$job['qty'] ?>台（納品 <?= View::e(Clock::dayLabel($job['delivery_date'])) ?>）」1件ぶんの必要な材料です。
-  <a href="<?= View::e(App::url('/schedule?from=' . Clock::weekStart($date))) ?>">スケジュール</a>に戻る／
+<p class="page-lead">発注「<?= View::e(Jobs::label($job)) ?>　<?= View::e(Jobs::itemSummary($job['items'])) ?>（納品 <?= View::e(Clock::dayLabel($job['delivery_date'])) ?>）」1件ぶんの必要な材料です（この表は在庫をこの発注だけで見た場合です。ほかの発注との取り合いは左の「発注ごと」に出ます）。
+  <a href="<?= View::e(App::url('/schedule?job=' . (int)$job['id'])) ?>">スケジュール</a>に戻る／
   <a href="<?= View::e(App::url('/require?date=' . $date)) ?>">期間全体で見る</a></p>
 <?php else: ?>
 <p class="page-lead">開始日から「先読み期間」ぶんの発注（つくる予定）をまとめて、材料が何をどれだけ買えばよいかを出します。発注の登録や仕込み日の調整は
@@ -43,7 +44,7 @@ $q = fn(string $d) => $job !== null ? '/require?job=' . (int)$job['id'] : '/requ
   <?php foreach ($day_list as $d): foreach ($plans_by_day[$d] ?? [] as $pl): ?>
     <tr>
       <td><?= View::e(Clock::dayLabel($d)) ?></td>
-      <td><?= View::e($pl['customer_name'] ?: '-') ?></td>
+      <td><?= View::e(Jobs::label($pl)) ?></td>
       <td><?= View::e($pl['name']) ?><?= $pl['spec'] ? '（' . View::e($pl['spec']) . '）' : '' ?></td>
       <td class="num"><?= (int)$pl['qty'] ?>台</td>
       <td><?= View::e(Clock::dayLabel($pl['delivery_date'])) ?></td>

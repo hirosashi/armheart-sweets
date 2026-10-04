@@ -9,11 +9,16 @@ use App\Core\Db;
 use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\View;
+use App\Services\Allocation;
 use App\Services\Consumption;
+use App\Services\Jobs;
 use App\Services\Requirement;
 
 class StockController
 {
+    /** 在庫の見込みを出す日数 */
+    public const PROJECTION_DAYS = 14;
+
     public const REASONS = [
         'stocktake' => '棚卸し',
         'receive'   => '入荷',
@@ -87,6 +92,7 @@ class StockController
             App::redirect('/stock');
         }
 
+        $proj = Allocation::projection($id, Clock::today(), self::PROJECTION_DAYS);
         View::render('stock/show', [
             'material' => $material,
             'lots'     => Db::all('SELECT * FROM inventory WHERE material_id = ? ORDER BY expiry_date IS NULL, expiry_date, id', [$id]),
@@ -101,6 +107,8 @@ class StockController
             ),
             'today'    => Clock::today(),
             'consumed' => Consumption::detailByMaterial($id),
+            'proj'     => $proj,
+            'uses'     => Jobs::useLabels($proj['needs']),
         ]);
     }
 

@@ -32,8 +32,9 @@ class RequireController
         if ($job !== null) {
             // 1件の発注に絞るときは、その発注の仕込み日〜仕上げ日をまとめて見る
             $first = Db::value('SELECT MIN(target_date) FROM job_parts WHERE job_id = ?', [$jobId]);
-            $date  = $first ?: $job['finish_date'];
-            $to    = max($job['finish_date'], (string)Db::value('SELECT IFNULL(MAX(target_date), ?) FROM job_parts WHERE job_id = ?', [$job['finish_date'], $jobId]));
+            $finish = (string)Db::value('SELECT IFNULL(MAX(finish_date), ?) FROM job_items WHERE job_id = ?', [$job['delivery_date'], $jobId]);
+            $date  = $first ?: $finish;
+            $to    = max($finish, (string)Db::value('SELECT IFNULL(MAX(target_date), ?) FROM job_parts WHERE job_id = ?', [$finish, $jobId]));
             $days  = (int)Clock::parse($date)->diff(Clock::parse($to))->days + 1;
         }
 

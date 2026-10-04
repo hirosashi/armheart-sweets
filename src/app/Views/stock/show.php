@@ -2,8 +2,10 @@
 use App\Controllers\StockController;
 use App\Core\App;
 use App\Core\Auth;
+use App\Core\Clock;
 use App\Core\Csrf;
 use App\Core\View;
+use App\Services\Allocation;
 $title = $material['name'] . 'の在庫';
 $editable = Auth::can('stock');
 $stockSum = array_sum(array_map(static fn($l) => (float)$l['qty'], $lots));
@@ -22,6 +24,61 @@ $stockSum = array_sum(array_map(static fn($l) => (float)$l['qty'], $lots));
     <tr><th>今ある量（合計）</th><td colspan="3"><strong><?= View::e(View::num($stockSum, 1)) ?><?= View::e($material['unit']) ?></strong></td></tr>
   </tbody>
 </table>
+
+<h2 class="sec-title" id="plan">これからの見込み（今ある量 ＋ 納品予定 − 使う予定）</h2>
+<?php if ((int)$material['is_stock_managed'] === 0): ?>
+  <p class="note">この材料は在庫管理なしです。</p>
+<?php elseif ($proj['needs'] === [] && $proj['incoming'] === []): ?>
+  <p class="note">進行中の発注で使う予定も、納品待ちの材料の発注もありません。</p>
+<?php else: ?>
+<table class="table table-narrow proj">
+  <thead><tr><th>日</th><th class="num">納品予定</th><th class="num">使う予定</th><th class="num">残りの見込み</th></tr></thead>
+  <tbody>
+  <?php foreach ($proj['days'] as $i => $d): ?>
+    <?php if ($i > 0 && $d['in'] == 0 && $d['use'] == 0) { continue; } ?>
+    <tr>
+      <td><?= View::e(Clock::dayLabel($d['date'])) ?><?= $i === 0 ? '（今日。過ぎた予定も含む）' : '' ?></td>
+      <td class="num"><?= $d['in'] > 0 ? View::e(View::num($d['in'], 1)) : '' ?></td>
+      <td class="num"><?= $d['use'] > 0 ? View::e(View::num($d['use'], 1)) : '' ?></td>
+      <td class="num<?= $d['balance'] < 0 ? ' minus' : '' ?>"><?= View::e(View::num($d['balance'], 1)) ?><?= View::e($material['unit']) ?></td>
+    </tr>
+  <?php endforeach; ?>
+  <?php if ($proj['later']['in'] > 0 || $proj['later']['use'] > 0): ?>
+    <tr><td>それより後</td><td class="num"><?= View::e(View::num($proj['later']['in'], 1)) ?></td>
+      <td class="num"><?= View::e(View::num($proj['later']['use'], 1)) ?></td><td></td></tr>
+  <?php endif; ?>
+  </tbody>
+</table>
+
+<h3 class="sec-title">使う予定の割り当て（納品日の早い発注から順）</h3>
+<table class="table">
+  <thead><tr><th>発注</th><th>商品・部位</th><th>使う日</th><th class="num">使う量</th><th class="num">在庫から</th><th class="num">納品待ちから</th><th class="num">足りない分</th><th>判定</th></tr></thead>
+  <tbody>
+  <?php foreach ($proj['needs'] as $k => $n): ?>
+    <tr>
+      <td><a href="<?= View::e(App::url('/schedule?job=' . (int)$n['job_id'])) ?>"><?= View::e($uses[$k]['job']) ?></a></td>
+      <td><?= View::e($uses[$k]['what']) ?></td>
+      <td><?= View::e(Clock::dayLabel($n['use_date'])) ?></td>
+      <td class="num"><?= View::e(View::num($n['qty'], 1)) ?></td>
+      <td class="num"><?= View::e(View::num($n['from_stock'], 1)) ?></td>
+      <td class="num"><?= $n['from_po'] > 0 ? View::e(View::num($n['from_po'], 1)) . '（' . View::e(Clock::dayLabel((string)$n['arrival'])) . '）' : '' ?></td>
+      <td class="num<?= $n['short'] > 0 ? ' judge-short' : '' ?>"><?= $n['short'] > 0 ? View::e(View::num($n['short'], 1)) : '' ?></td>
+      <td><?= View::e(Allocation::JUDGE_LABELS[$n['judge']]) ?></td>
+    </tr>
+  <?php endforeach; ?>
+  </tbody>
+</table>
+<?php if ($proj['incoming'] !== []): ?>
+<p class="note">納品待ち：
+  <?php foreach ($proj['incoming'] as $r): ?>
+    <a href="<?= View::e(App::url('/orders/show?id=' . (int)$r['order_id'])) ?>"><?= View::e($r['order_no']) ?></a>
+    <?= View::e(View::num($r['qty'], 1)) ?><?= View::e($material['unit']) ?>（<?= View::e($r['arrival'] !== null ? Clock::dayLabel($r['arrival']) : '納品日未定') ?>）
+  <?php endforeach; ?>
+  ／<a href="<?= View::e(App::url('/require#short')) ?>">足りない材料を発注する</a></p>
+<?php else: ?>
+<p class="note"><a href="<?= View::e(App::url('/require#short')) ?>">足りない材料を発注する</a></p>
+<?php endif; ?>
+<?php endif; ?>
 
 <h2 class="sec-title">在庫の内訳</h2>
 <table class="table">

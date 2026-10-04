@@ -39,6 +39,15 @@ $editable = Auth::can('progress');
             <?php endif; ?>
             <?php if ($c['need_qty'] > 0): ?>／必要 <?= View::e(View::num($c['need_qty'], 1)) ?><?= View::e($c['unit']) ?><?php endif; ?>
           </div>
+          <?php if (($breakdown[$c['part_id']] ?? []) !== []): ?>
+            <div class="kanban-body note">この日の内訳（できた回数は納品の早い発注から割り当て）
+              <?php foreach ($breakdown[$c['part_id']] as $b): ?>
+                <br>・<a href="<?= View::e(App::url('/schedule?job=' . $b['job_id'])) ?>"><?= View::e($b['label']) ?></a>
+                <?= View::e($b['item']) ?> 納品<?= View::e(Clock::dayLabel($b['delivery_date'])) ?>：
+                <?= View::e(View::num($b['batches'], 0)) ?>回<?= $b['done_qty'] > 0 ? '（できた ' . View::e(View::num($b['done_qty'], 1)) . '）' : '' ?>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
           <?php if ($editable): ?>
           <form method="post" action="<?= View::e(App::url('/progress/save')) ?>">
             <?= Csrf::field() ?>

@@ -245,10 +245,11 @@ CREATE TABLE production_plans (
 CREATE TABLE jobs (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
   customer_name VARCHAR(100) NULL COMMENT '得意先',
-  product_id    INT UNSIGNED NOT NULL,
-  qty           INT UNSIGNED NOT NULL COMMENT '台数',
+  title         VARCHAR(100) NULL COMMENT '案件名',
+  product_id    INT UNSIGNED NULL COMMENT '旧列（未使用。job_items へ移行済み）',
+  qty           INT UNSIGNED NULL COMMENT '旧列（未使用。job_items へ移行済み）',
   delivery_date DATE         NOT NULL COMMENT '納品日',
-  finish_date   DATE         NOT NULL COMMENT '仕上げ日（商品用資材はこの日に使う）',
+  finish_date   DATE         NULL COMMENT '旧列（未使用。job_items へ移行済み）',
   status        ENUM('open','done','canceled') NOT NULL DEFAULT 'open' COMMENT '進行中/納品済/取消',
   note          VARCHAR(255) NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -258,11 +259,28 @@ CREATE TABLE jobs (
   PRIMARY KEY (id),
   KEY idx_jobs_delivery (status, delivery_date),
   CONSTRAINT fk_job_product FOREIGN KEY (product_id) REFERENCES products(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='発注（得意先からの注文＝つくる予定）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='発注（得意先からの注文＝案件。作る商品は job_items）';
+
+CREATE TABLE job_items (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  job_id       INT UNSIGNED NOT NULL,
+  product_id   INT UNSIGNED NOT NULL,
+  qty          INT UNSIGNED NOT NULL COMMENT '台数',
+  finish_date  DATE         NOT NULL COMMENT '仕上げ日（商品用資材はこの日に使う）',
+  sort_no      INT          NOT NULL DEFAULT 0,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_job_items_job (job_id),
+  KEY idx_job_items_finish (finish_date),
+  CONSTRAINT fk_ji_job     FOREIGN KEY (job_id)     REFERENCES jobs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ji_product FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='発注で作る商品（1件の発注に複数）';
 
 CREATE TABLE job_parts (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
   job_id       INT UNSIGNED NOT NULL,
+  job_item_id  INT UNSIGNED NOT NULL COMMENT 'どの商品のための仕込みか',
   part_id      INT UNSIGNED NOT NULL,
   target_date  DATE          NOT NULL COMMENT '仕込む日',
   batches      DECIMAL(12,3) NOT NULL DEFAULT 0 COMMENT 'その日に仕込む回数',
@@ -272,7 +290,9 @@ CREATE TABLE job_parts (
   PRIMARY KEY (id),
   KEY idx_job_parts_date (target_date, part_id),
   KEY idx_job_parts_job (job_id),
+  KEY idx_job_parts_item (job_item_id),
   CONSTRAINT fk_jp_job  FOREIGN KEY (job_id)  REFERENCES jobs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_jp_item FOREIGN KEY (job_item_id) REFERENCES job_items(id) ON DELETE CASCADE,
   CONSTRAINT fk_jp_part FOREIGN KEY (part_id) REFERENCES parts(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='発注ごとの部位の仕込み割り振り（日・回数）';
 

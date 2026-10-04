@@ -63,7 +63,7 @@ a{color:var(--navy-l)}
 /* ---------- レイアウト ---------- */
 .layout{display:flex; min-height:calc(100vh - 140px); align-items:stretch}
 .sidemenu{
-  width:250px; flex:0 0 250px; background:#fff;
+  width:360px; flex:0 0 360px; background:#fff;
   border-right:1px solid var(--line); padding:0;
   position:sticky; top:var(--topbar-h); align-self:flex-start;
   max-height:calc(100vh - var(--topbar-h)); overflow-y:auto;
@@ -325,3 +325,52 @@ input[type=text],input[type=number],input[type=date],textarea,select{
 .g-inline{display:flex; gap:4px; align-items:center; flex-wrap:wrap; font-size:12px}
 .g-inline select,.g-inline input{font-size:12px}
 @media (max-width:1100px){ .gantt th.g-label,.gantt td.g-label{width:240px; min-width:240px} }
+
+/* 左メニュー：発注ごとツリー／業務の流れ のタブ */
+.side-tabs{display:flex; position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid var(--line)}
+.side-tab{flex:1 1 0; border:0; background:#F4F6FA; padding:9px 4px; font-size:13px; cursor:pointer; color:var(--gray); border-bottom:3px solid transparent}
+.side-tab.active{background:#fff; color:var(--navy); font-weight:bold; border-bottom-color:var(--navy)}
+.tree{padding:0 0 12px; font-size:12px}
+.tree-head{padding:10px 12px 6px; font-weight:bold; color:var(--navy)}
+.tree-empty,.tree-note{padding:6px 12px; color:var(--gray); font-size:11px}
+.tree details > summary{list-style:none; cursor:pointer; position:relative}
+.tree details > summary::-webkit-details-marker{display:none}
+.tree details > summary::before{content:'▶'; position:absolute; left:2px; top:7px; font-size:9px; color:var(--gray)}
+.tree details[open] > summary::before{content:'▼'}
+.tree-node{margin:0}
+.tree-job{border-top:1px solid var(--line)}
+.tree-job > summary{padding-left:12px; background:#F8F9FC}
+.tree-item{margin-left:14px}
+.tree-item > summary{padding-left:12px}
+.tree-part{margin-left:14px}
+.tree-part > summary{padding-left:12px}
+.tree-more{margin-left:14px}
+.tree-more > summary{padding:4px 0 4px 14px; color:var(--green); font-size:11px}
+.tree-mat{margin-left:14px}
+.tree-part > .tree-note{margin-left:14px}
+.tree-row{display:flex; flex-wrap:wrap; align-items:center; gap:2px 6px; padding:5px 8px 5px 4px; color:inherit; text-decoration:none; border-left:3px solid transparent}
+a.tree-row:hover{background:var(--blue)}
+.tree-row.here{background:var(--blue); border-left-color:var(--navy)}
+.tree-row.here .tree-name{color:var(--navy)}
+.tree-name{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.tree-job > summary .tree-name{font-weight:bold; flex-basis:100%}
+.tree-item > summary .tree-name{font-weight:bold}
+.tree-info{font-size:11px; color:var(--gray); white-space:nowrap}
+.tree-late{color:var(--red); font-weight:bold}
+.tree-rate{display:inline-flex; align-items:center; gap:4px; font-size:11px; margin-left:auto}
+.tree-rate .bar{width:60px; margin:0}
+.tree-badge{font-size:10px; border-radius:9px; padding:0 6px; white-space:nowrap}
+.tj-short,.ts-late{background:#FDE8E8; color:var(--red); font-weight:bold}
+.tj-ordered{background:#EFE7FB; color:#5B3A9A}
+.tj-ok,.ts-done{background:var(--green-bg); color:var(--green)}
+.ts-doing{background:#FFF0DD; color:#A65E00}
+.ts-todo{background:#E8EEF7; color:#3F5C86}
+
+/* スケジュール：作る商品の行 */
+.gantt tr.g-item td.g-label{padding-left:22px; background:#FBFCFE}
+.g-item-name{font-weight:bold; color:var(--navy)}
+.add-items{margin:6px 0}
+.add-items td{padding:3px 6px}
+
+/* 材料の在庫の見込み */
+.proj td.minus{color:var(--red); font-weight:bold}

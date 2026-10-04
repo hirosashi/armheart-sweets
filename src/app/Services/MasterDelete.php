@@ -111,7 +111,8 @@ class MasterDelete
             "SELECT DISTINCT j.customer_name, j.delivery_date, p.name AS product_name
                FROM job_parts jp
                JOIN jobs j ON j.id = jp.job_id
-               JOIN products p ON p.id = j.product_id
+               JOIN job_items ji ON ji.id = jp.job_item_id
+               JOIN products p ON p.id = ji.product_id
               WHERE jp.part_id = ? AND j.status = 'open'
               ORDER BY j.delivery_date",
             [$id]
@@ -125,9 +126,11 @@ class MasterDelete
     {
         $out = [];
         foreach (Db::all(
-            "SELECT j.customer_name, j.delivery_date, p.name AS product_name
-               FROM jobs j JOIN products p ON p.id = j.product_id
-              WHERE j.product_id = ? AND j.status = 'open'
+            "SELECT DISTINCT j.customer_name, j.delivery_date, p.name AS product_name
+               FROM job_items ji
+               JOIN jobs j ON j.id = ji.job_id
+               JOIN products p ON p.id = ji.product_id
+              WHERE ji.product_id = ? AND j.status = 'open'
               ORDER BY j.delivery_date",
             [$id]
         ) as $r) {

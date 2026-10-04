@@ -52,6 +52,7 @@ $router->post('/parts/material', [PartController::class, 'saveMaterial']);
 $router->get('/schedule',             [ScheduleController::class, 'index']);
 $router->post('/schedule/job',        [ScheduleController::class, 'saveJob']);
 $router->post('/schedule/job/delete', [ScheduleController::class, 'deleteJob']);
+$router->post('/schedule/item',       [ScheduleController::class, 'saveItem']);
 $router->post('/schedule/part',       [ScheduleController::class, 'savePart']);
 
 // 部位の進み具合

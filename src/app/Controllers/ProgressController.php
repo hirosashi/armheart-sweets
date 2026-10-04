@@ -10,6 +10,7 @@ use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\View;
 use App\Services\Consumption;
+use App\Services\Jobs;
 use App\Services\Progress;
 use App\Services\Requirement;
 
@@ -40,6 +41,7 @@ class ProgressController
             'next_date' => Clock::shiftDays($date, 1),
             'columns'   => $columns,
             'has_plan'  => Requirement::parts($date) !== [],
+            'breakdown' => Jobs::partBreakdown($date),
         ]);
     }
 
