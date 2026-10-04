@@ -64,7 +64,7 @@ class ProgressController
 
         $planned = (float)($_POST['planned_qty'] ?? 0);
         $carried = Progress::carriedFor($date, $partId);
-        $done    = (float)($_POST['done_qty'] ?? 0);
+        $done    = $status === 'todo' ? 0.0 : (float)($_POST['done_qty'] ?? 0);
         if ($done < 0) {
             Session::flash('warn', 'できた回数は0以上で入力してください。');
             App::redirect('/progress?date=' . $date);
