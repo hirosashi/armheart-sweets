@@ -27,7 +27,7 @@ $title = '材料の在庫';
 
 <table class="table">
   <thead>
-    <tr><th>材料</th><th>メーカー</th><th class="num">在庫</th><th class="num">使った量（<?= (int)$days ?>日間）</th><th>いちばん近い賞味期限</th><th class="num">仕入単位</th><th></th></tr>
+    <tr><th>材料</th><th>メーカー</th><th class="num">在庫</th><th class="num">使った量（<?= (int)$days ?>日間）</th><th>いちばん近い賞味期限</th><th class="num">荷姿</th><th></th></tr>
   </thead>
   <tbody>
   <?php foreach ($materials as $m): ?>

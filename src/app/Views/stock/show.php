@@ -17,7 +17,7 @@ $stockSum = array_sum(array_map(static fn($l) => (float)$l['qty'], $lots));
   <tbody>
     <tr><th>メーカー</th><td><?= View::e($material['maker_name']) ?></td>
         <th>単位</th><td><?= View::e($material['unit']) ?></td></tr>
-    <tr><th>仕入単位</th><td><?php if ($material['purchase_qty'] !== null): ?>
+    <tr><th>荷姿</th><td><?php if ($material['purchase_qty'] !== null): ?>
             <?= View::e(View::num($material['purchase_qty'], 0)) ?><?= View::e($material['unit']) ?>／<?= View::e($material['purchase_unit']) ?>
         <?php endif; ?></td>
         <th>アレルゲン</th><td><?= View::e($material['allergens']) ?></td></tr>

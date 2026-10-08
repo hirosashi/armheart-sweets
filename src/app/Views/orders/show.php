@@ -29,18 +29,14 @@ $receivedCount = count(array_filter($items, fn($i) => (float)$i['received_qty'] 
 
   <table class="table table-narrow">
     <tbody>
-      <tr><th>発注先</th><td colspan="3"><?= View::e($order['supplier_name']) ?></td></tr>
+      <tr><th>メーカー</th><td colspan="3"><?= View::e($order['supplier_name']) ?></td></tr>
       <tr>
-        <th>発注元（自社）</th>
-        <td>
-          <select name="company_id" <?= $editable ? '' : 'disabled' ?>>
-            <option value="">-- 選ぶ --</option>
-            <?php foreach ($companies as $c): ?>
-              <option value="<?= (int)$c['id'] ?>" <?= (int)$order['company_id'] === (int)$c['id'] ? 'selected' : '' ?>>
-                <?= View::e($c['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </td>
+        <th>発注先</th>
+        <td><input type="text" name="vendor_name" value="<?= View::e($order['vendor_name']) ?>" class="w-300" maxlength="100"
+                   list="vendor-list" placeholder="実際に発注する商社名" <?= $editable ? '' : 'readonly' ?>>
+          <datalist id="vendor-list">
+            <?php foreach ($vendors as $vd): ?><option value="<?= View::e($vd['vendor_name']) ?>"><?php endforeach; ?>
+          </datalist></td>
         <th>納品場所</th>
         <td><input type="text" name="delivery_place" value="<?= View::e($order['delivery_place']) ?>" class="w-300" <?= $editable ? '' : 'readonly' ?>></td>
       </tr>

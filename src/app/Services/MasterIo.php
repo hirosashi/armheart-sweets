@@ -22,6 +22,8 @@ class MasterIo
 
     private const SUPPLIER_TYPES = ['purchase' => '仕入先', 'sales' => '販売先', 'both' => '両方'];
     private const ORDER_METHODS  = ['fax' => 'FAX', 'email' => 'メール', 'tel' => '電話', 'web' => 'Web', 'other' => 'その他'];
+    /** 以前の見出し名 => 今の見出し名（前に書き出したファイルも取り込めるように） */
+    private const HEADER_ALIASES = ['仕入単位' => '荷姿', '仕入単位あたりの数量' => '荷姿あたりの数量'];
 
     /** 名前で参照する表と、その名前を登録するシート */
     private const REF_SHEETS = [
@@ -77,8 +79,8 @@ class MasterIo
                 ['h' => 'メーカー',                 'c' => 'maker_name',        't' => 'str', 'max' => 200],
                 ['h' => 'アレルゲン',               'c' => 'allergens',         't' => 'str', 'max' => 255],
                 ['h' => '単位',                     'c' => 'unit',              't' => 'str', 'max' => 20, 'default' => 'g'],
-                ['h' => '仕入単位',                 'c' => 'purchase_unit',     't' => 'str', 'max' => 20],
-                ['h' => '仕入単位あたりの数量',     'c' => 'purchase_qty',      't' => 'dec'],
+                ['h' => '荷姿',                     'c' => 'purchase_unit',     't' => 'str', 'max' => 20],
+                ['h' => '荷姿あたりの数量',         'c' => 'purchase_qty',      't' => 'dec'],
                 ['h' => '仕入先名',                 'c' => 'supplier_id',       't' => 'ref', 'ref' => 'suppliers'],
                 ['h' => '支給品',                   'c' => 'is_supplied',       't' => 'bool', 'default' => 0],
                 ['h' => '在庫管理',                 'c' => 'is_stock_managed',  't' => 'bool', 'default' => 1],
@@ -430,6 +432,7 @@ class MasterIo
         $idx = [];
         foreach ($header as $i => $h) {
             $h = trim($h);
+            $h = self::HEADER_ALIASES[$h] ?? $h;
             if ($h !== '' && !isset($idx[$h])) {
                 $idx[$h] = $i;
             }

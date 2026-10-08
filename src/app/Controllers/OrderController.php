@@ -67,9 +67,12 @@ class OrderController
         }
 
         View::render('orders/show', [
-            'order'     => $order,
-            'items'     => self::items($id),
-            'companies' => Db::all('SELECT * FROM companies WHERE deleted_at IS NULL ORDER BY sort_no, id'),
+            'order'   => $order,
+            'items'   => self::items($id),
+            'vendors' => Db::all(
+                "SELECT DISTINCT vendor_name FROM purchase_orders
+                  WHERE vendor_name IS NOT NULL AND deleted_at IS NULL ORDER BY vendor_name"
+            ),
         ]);
     }
 
@@ -90,7 +93,7 @@ class OrderController
         ], false);
     }
 
-    /** 発注内容の更新（発注元・希望納期・納品場所・備考・数量） */
+    /** 発注内容の更新（発注先・希望納期・納品場所・備考・数量） */
     public static function save(): void
     {
         Auth::requireLogin();
@@ -105,12 +108,11 @@ class OrderController
             App::redirect('/orders');
         }
 
-        $companyId = (int)($_POST['company_id'] ?? 0);
         Db::exec(
-            'UPDATE purchase_orders SET company_id = ?, delivery_place = ?, order_date = ?, desired_date = ?,
+            'UPDATE purchase_orders SET vendor_name = ?, delivery_place = ?, order_date = ?, desired_date = ?,
                     note = ?, updated_by = ?
               WHERE id = ?',
-            [$companyId > 0 ? $companyId : null,
+            [mb_substr(trim((string)($_POST['vendor_name'] ?? '')), 0, 100) ?: null,
              trim((string)($_POST['delivery_place'] ?? '')) ?: null,
              Clock::normalizeDate($_POST['order_date'] ?? null),
              Clock::normalizeDate($_POST['desired_date'] ?? null),

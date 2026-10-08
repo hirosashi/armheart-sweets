@@ -43,8 +43,8 @@ $kind = $material['kind'] ?? 'material';
       <?php endforeach; ?>
     </select>
   </label>
-  <label>仕入単位<input type="text" name="purchase_unit" value="<?= $v('purchase_unit') ?>" class="w-100" placeholder="袋／本／ケース"></label>
-  <label>仕入単位あたりの数量<input type="number" step="0.001" name="purchase_qty" value="<?= $v('purchase_qty') ?>" class="w-100" placeholder="例：25000"> <span class="note">例：1袋＝25000g なら 25000</span></label>
+  <label>荷姿<input type="text" name="purchase_unit" value="<?= $v('purchase_unit') ?>" class="w-100" placeholder="袋／本／ケース"></label>
+  <label>荷姿あたりの数量<input type="number" step="0.001" name="purchase_qty" value="<?= $v('purchase_qty') ?>" class="w-100" placeholder="例：25000"> <span class="note">例：1袋＝25000g なら 25000</span></label>
 
   <div class="field">
     <label class="inline"><input type="checkbox" name="is_stock_managed" <?= $checked('is_stock_managed', 1) ?>> 在庫・発注の対象にする（水などは外す）</label>

@@ -18,7 +18,7 @@ $statusClass = ['draft' => 'judge-short', 'ordered' => 'judge-tight', 'partial' 
 
 <table class="table">
   <thead>
-    <tr><th>発注番号</th><th>発注先</th><th>発注元</th><th>発注日</th><th>希望納期</th>
+    <tr><th>発注番号</th><th>メーカー</th><th>発注先</th><th>発注日</th><th>希望納期</th>
         <th class="num">品目数</th><th>納品</th><th>状態</th><th></th></tr>
   </thead>
   <tbody>
@@ -26,7 +26,7 @@ $statusClass = ['draft' => 'judge-short', 'ordered' => 'judge-tight', 'partial' 
     <tr>
       <td><a href="<?= View::e(App::url('/orders/show?id=' . $o['id'])) ?>"><?= View::e($o['order_no']) ?></a></td>
       <td><?= View::e($o['supplier_name']) ?></td>
-      <td><?= View::e($o['company_name']) ?></td>
+      <td><?= View::e($o['vendor_name']) ?></td>
       <td><?= View::e(View::d($o['order_date'])) ?></td>
       <td><?= View::e(View::d($o['desired_date'])) ?></td>
       <td class="num"><?= (int)$o['item_count'] ?></td>

@@ -127,11 +127,18 @@ class RequireController
 
         $created = 0;
         foreach ($bySupplier as $supplierId => $items) {
+            // 発注先（商社）は、同じメーカーで前回使ったものを入れておく
+            $vendor = Db::value(
+                'SELECT vendor_name FROM purchase_orders
+                  WHERE supplier_id = ? AND vendor_name IS NOT NULL AND deleted_at IS NULL
+                  ORDER BY id DESC LIMIT 1',
+                [$supplierId]
+            );
             $orderId = Db::insert(
-                'INSERT INTO purchase_orders (order_no, company_id, supplier_id, delivery_place, status,
+                'INSERT INTO purchase_orders (order_no, company_id, supplier_id, vendor_name, delivery_place, status,
                         order_date, period_from, period_to, job_id, desired_date, note, created_by)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-                [self::nextOrderNo(), $company['id'] ?? null, $supplierId, $company['delivery_place'] ?? null,
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                [self::nextOrderNo(), $company['id'] ?? null, $supplierId, $vendor ?: null, $company['delivery_place'] ?? null,
                  'draft', Clock::today(), $date, $to, $jobId, $date,
                  Clock::dayLabel($date) . '〜' . Clock::dayLabel($to) . 'の発注（つくる予定）から作成', Auth::id()]
             );
