@@ -19,6 +19,7 @@ class Auth
         'order'      => ['admin', 'purchase'],
         'stock'      => ['admin', 'purchase'],
         'material'   => ['admin', 'purchase'],
+        'master'     => ['admin'],
         'user'       => ['admin'],
     ];
 

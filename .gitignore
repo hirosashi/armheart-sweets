@@ -1,6 +1,7 @@
 # 環境ごとの設定（DB接続情報などを含むため管理しない。config.sample.php を複製して作る）
 src/config/config.local.php
 src/config/config.sakura.php
+src/config/config.production.php
 
 # ログ
 src/storage/logs/*

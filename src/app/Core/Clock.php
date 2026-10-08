@@ -119,6 +119,29 @@ class Clock
         return $d->modify(($weeks >= 0 ? '+' : '') . $weeks . ' weeks')->format(self::DB_DATE);
     }
 
+    /** 日付を前後に移動する（前日・翌日、先読み期間の終わりなど） */
+    public static function shiftDays(string $date, int $days): string
+    {
+        $d = self::parse($date) ?? self::nowObject();
+        return $d->modify(($days >= 0 ? '+' : '') . $days . ' days')->format(self::DB_DATE);
+    }
+
+    /** 開始日から日数ぶんの最終日（7日なら開始日を含めて7日目） */
+    public static function rangeEnd(string $from, int $days): string
+    {
+        return self::shiftDays($from, max(1, $days) - 1);
+    }
+
+    /** 週の月曜日から日曜日までの7日ぶんの日付 */
+    public static function weekDays(string $weekStart): array
+    {
+        $out = [];
+        for ($i = 0; $i < 7; $i++) {
+            $out[] = self::shiftDays($weekStart, $i);
+        }
+        return $out;
+    }
+
     /**
      * DBから取り出した日時文字列などを日本時間として解釈する。
      * 解釈できない値・空値は null を返す（画面側で空欄表示にできる）。

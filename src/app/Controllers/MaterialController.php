@@ -9,6 +9,7 @@ use App\Core\OperationLog;
 use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
+use App\Services\MasterDelete;
 
 class MaterialController
 {
@@ -76,6 +77,7 @@ class MaterialController
 
         View::render('materials/edit', [
             'material'  => $material,
+            'usages'    => $material ? MasterDelete::usages('material', $id) : [],
             'suppliers' => Db::all(
                 "SELECT id, name FROM suppliers
                   WHERE deleted_at IS NULL AND supplier_type IN ('purchase','both')
@@ -96,7 +98,7 @@ class MaterialController
 
         $id     = (int)($_POST['id'] ?? 0);
         $fields = ['name', 'alias_names', 'category', 'maker_name', 'allergens',
-                   'purchase_unit', 'price_source', 'note'];
+                   'purchase_unit', 'note'];
         $data = [];
         foreach ($fields as $f) {
             $value = trim((string)($_POST[$f] ?? ''));
@@ -105,7 +107,6 @@ class MaterialController
         $kind        = (string)($_POST['kind'] ?? 'material');
         $unit        = trim((string)($_POST['unit'] ?? 'g'));
         $purchaseQty = ($_POST['purchase_qty'] ?? '') === '' ? null : (float)$_POST['purchase_qty'];
-        $pricePerKg  = ($_POST['price_per_kg'] ?? '') === '' ? null : (float)$_POST['price_per_kg'];
         $supplierId  = (int)($_POST['supplier_id'] ?? 0) ?: null;
         $isSupplied  = isset($_POST['is_supplied']) ? 1 : 0;
         $isStock     = isset($_POST['is_stock_managed']) ? 1 : 0;
@@ -123,14 +124,14 @@ class MaterialController
 
         $params = [
             $data['name'], $data['alias_names'], $kind, $data['category'], $data['maker_name'], $data['allergens'],
-            $unit, $data['purchase_unit'], $purchaseQty, $pricePerKg, $data['price_source'],
+            $unit, $data['purchase_unit'], $purchaseQty,
             $supplierId, $isSupplied, $isStock, $hasExpiry, $data['note'],
         ];
 
         if ($id > 0) {
             Db::exec(
                 'UPDATE materials SET name=?, alias_names=?, kind=?, category=?, maker_name=?, allergens=?,
-                        unit=?, purchase_unit=?, purchase_qty=?, price_per_kg=?, price_source=?,
+                        unit=?, purchase_unit=?, purchase_qty=?,
                         supplier_id=?, is_supplied=?, is_stock_managed=?, has_expiry=?, note=?, updated_by=?
                   WHERE id = ?',
                 [...$params, Auth::id(), $id]
@@ -140,9 +141,9 @@ class MaterialController
         } else {
             $id = Db::insert(
                 'INSERT INTO materials (name, alias_names, kind, category, maker_name, allergens,
-                        unit, purchase_unit, purchase_qty, price_per_kg, price_source,
+                        unit, purchase_unit, purchase_qty,
                         supplier_id, is_supplied, is_stock_managed, has_expiry, note, created_by)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [...$params, Auth::id()]
             );
             OperationLog::write('create', 'materials', (string)$id, '材料を登録しました：' . $data['name']);
@@ -150,6 +151,33 @@ class MaterialController
         }
 
         App::redirect('/materials?q=' . urlencode((string)$data['name']));
+    }
+
+    /** 材料の削除（使われているものは消さない） */
+    public static function delete(): void
+    {
+        Auth::requireLogin();
+        Csrf::verify();
+        if (!Auth::can('material')) {
+            Session::flash('warn', 'この操作をする権限がありません。');
+            App::redirect('/materials');
+        }
+
+        $id  = (int)($_POST['id'] ?? 0);
+        $row = Db::one('SELECT name FROM materials WHERE id = ? AND deleted_at IS NULL', [$id]);
+        if (!$row) {
+            App::redirect('/materials');
+        }
+
+        $usages = MasterDelete::delete('material', $id);
+        if ($usages !== []) {
+            Session::flash('warn', 'まだ使われているため削除できません：' . implode('／', $usages));
+            App::redirect('/materials/edit?id=' . $id);
+        }
+
+        OperationLog::write('delete', 'materials', (string)$id, '材料を削除しました：' . $row['name']);
+        Session::flash('info', '「' . $row['name'] . '」を削除しました。');
+        App::redirect('/materials');
     }
 
     /** 入力欄の選択肢用（材料の一覧） */

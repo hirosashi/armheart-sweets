@@ -8,12 +8,14 @@ use App\Core\Auth;
 use App\Core\Router;
 use App\Controllers\AuthController;
 use App\Controllers\HomeController;
+use App\Controllers\MasterIoController;
 use App\Controllers\MaterialController;
 use App\Controllers\OrderController;
 use App\Controllers\PartController;
 use App\Controllers\ProductController;
 use App\Controllers\ProgressController;
 use App\Controllers\RequireController;
+use App\Controllers\ScheduleController;
 use App\Controllers\StockController;
 
 $router = new Router();
@@ -35,6 +37,7 @@ $router->get('/products',           [ProductController::class, 'index']);
 $router->get('/products/show',      [ProductController::class, 'show']);
 $router->get('/products/edit',      [ProductController::class, 'edit']);
 $router->post('/products/save',     [ProductController::class, 'save']);
+$router->post('/products/delete',   [ProductController::class, 'delete']);
 $router->post('/products/part',     [ProductController::class, 'savePart']);
 $router->post('/products/material', [ProductController::class, 'saveMaterial']);
 
@@ -42,7 +45,15 @@ $router->post('/products/material', [ProductController::class, 'saveMaterial']);
 $router->get('/parts',           [PartController::class, 'index']);
 $router->get('/parts/show',      [PartController::class, 'show']);
 $router->post('/parts/save',     [PartController::class, 'save']);
+$router->post('/parts/delete',   [PartController::class, 'delete']);
 $router->post('/parts/material', [PartController::class, 'saveMaterial']);
+
+// スケジュール（発注ごとのガントチャート）
+$router->get('/schedule',             [ScheduleController::class, 'index']);
+$router->post('/schedule/job',        [ScheduleController::class, 'saveJob']);
+$router->post('/schedule/job/delete', [ScheduleController::class, 'deleteJob']);
+$router->post('/schedule/item',       [ScheduleController::class, 'saveItem']);
+$router->post('/schedule/part',       [ScheduleController::class, 'savePart']);
 
 // 部位の進み具合
 $router->get('/progress',       [ProgressController::class, 'index']);
@@ -50,7 +61,6 @@ $router->post('/progress/save', [ProgressController::class, 'save']);
 
 // 必要な材料と足りない分
 $router->get('/require',        [RequireController::class, 'index']);
-$router->post('/require/plan',  [RequireController::class, 'savePlan']);
 $router->post('/require/order', [RequireController::class, 'createOrders']);
 
 // 発注
@@ -59,6 +69,7 @@ $router->get('/orders/show',   [OrderController::class, 'show']);
 $router->get('/orders/print',  [OrderController::class, 'print']);
 $router->post('/orders/save',  [OrderController::class, 'save']);
 $router->post('/orders/status', [OrderController::class, 'updateStatus']);
+$router->post('/orders/receive', [OrderController::class, 'receive']);
 
 // 材料の在庫・棚卸し
 $router->get('/stock',         [StockController::class, 'index']);
@@ -69,13 +80,19 @@ $router->post('/stock/adjust', [StockController::class, 'adjust']);
 $router->get('/materials',       [MaterialController::class, 'index']);
 $router->get('/materials/edit',  [MaterialController::class, 'edit']);
 $router->post('/materials/save', [MaterialController::class, 'save']);
+$router->post('/materials/delete', [MaterialController::class, 'delete']);
+
+// Excelで取り込み・書き出し（材料・仕入先・部位・商品と配合）
+$router->get('/master-io',         [MasterIoController::class, 'index']);
+$router->get('/master-io/export',  [MasterIoController::class, 'export']);
+$router->post('/master-io/import', [MasterIoController::class, 'import']);
 
 try {
     $router->dispatch();
 } catch (Throwable $e) {
     error_log($e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
-    App\Core\View::render('error', [
+    \App\Core\View::render('error', [
         'title'   => 'エラーが発生しました',
         'message' => App::config('debug')
             ? $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')'

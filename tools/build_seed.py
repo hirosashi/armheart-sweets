@@ -40,19 +40,6 @@ def clean(v):
     return s or None
 
 
-def parse_price_date(src):
-    """'2026.05.25納品書' / '2025/03/10納品書' / '2024.10.02' から日付を取り出す。"""
-    if not src:
-        return None
-    m = re.search(r'(\d{4})[./](\d{1,2})[./](\d{1,2})', str(src))
-    if not m:
-        return None
-    try:
-        return datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
-    except ValueError:
-        return None
-
-
 class Registry:
     """材料と業者を名前で一元管理する。"""
 
@@ -73,7 +60,7 @@ class Registry:
         return first
 
     def material(self, raw_name, maker=None, allergens=None, kind='material',
-                 unit='g', price_per_kg=None, price_source=None, is_supplied=0,
+                 unit='g', is_supplied=0,
                  purchase_unit=None, purchase_qty=None):
         name = clean(raw_name)
         if not name:
@@ -86,8 +73,6 @@ class Registry:
             m = {
                 'name': key, 'alias': alias, 'kind': kind, 'unit': unit,
                 'maker': clean(maker), 'allergens': clean(allergens),
-                'price_per_kg': price_per_kg, 'price_source': clean(price_source),
-                'price_date': parse_price_date(price_source),
                 'supplier': self.supplier(maker), 'is_supplied': is_supplied,
                 'stock': 0 if key in NO_STOCK else 1,
                 'purchase_unit': purchase_unit, 'purchase_qty': purchase_qty,
@@ -97,14 +82,9 @@ class Registry:
             if alias and not m['alias']:
                 m['alias'] = alias
             for field, value in (('maker', clean(maker)), ('allergens', clean(allergens)),
-                                 ('price_source', clean(price_source)),
                                  ('purchase_unit', purchase_unit)):
                 if value and not m[field]:
                     m[field] = value
-            if price_per_kg is not None and m['price_per_kg'] is None:
-                m['price_per_kg'] = price_per_kg
-            if m['price_date'] is None:
-                m['price_date'] = parse_price_date(price_source)
             if purchase_qty is not None and m['purchase_qty'] is None:
                 m['purchase_qty'] = purchase_qty
             if m['supplier'] is None:
@@ -117,14 +97,14 @@ class Registry:
 reg = Registry()
 
 # ---------------------------------------------------------------- 原材料マスタ
+# 原価計算表は材料名・メーカーの取得にのみ使う（単価は取り込まない）
 wb = openpyxl.load_workbook(COST_AH, data_only=True)
 ws = wb['マスタ(アルムハート)']
 for row in ws.iter_rows(min_row=2, values_only=True):
-    src, name, maker, price = row[0], row[1], row[2], row[3]
+    name, maker = row[1], row[2]
     if not clean(name):
         continue
-    reg.material(name, maker=maker, price_per_kg=price if isinstance(price, (int, float)) else None,
-                 price_source=src, purchase_unit='kg', purchase_qty=1000)
+    reg.material(name, maker=maker, purchase_unit='kg', purchase_qty=1000)
 
 # アレルゲンは配合表のマスタが持っている
 wb_r = openpyxl.load_workbook(RECIPE, data_only=True)
@@ -268,12 +248,11 @@ for key, m in reg.materials.items():
     rows.append("  (" + ", ".join([
         str(mat_ids[key]), q(m['name']), q(m['alias']), q(m['kind']), q(m['maker']),
         q(m['allergens']), q(m['unit']), q(m['purchase_unit']), num(m['purchase_qty']),
-        num(m['price_per_kg']), q(m['price_source']), q(m['price_date']),
         str(m['is_supplied']), str(m['stock']),
         str(sup_ids[m['supplier']]) if m['supplier'] in sup_ids else 'NULL',
     ]) + ")")
 out.append("INSERT INTO materials (id, name, alias_names, kind, maker_name, allergens, unit,"
-           " purchase_unit, purchase_qty, price_per_kg, price_source, price_date,"
+           " purchase_unit, purchase_qty,"
            " is_supplied, is_stock_managed, supplier_id) VALUES")
 out.append(",\n".join(rows) + ";")
 out.append("")
@@ -317,9 +296,9 @@ out.append("INSERT INTO product_materials (product_id, material_id, qty, sort_no
 out.append(",\n".join(rows) + ";")
 out.append("")
 
-out.append("-- 今週の生産計画（動作確認用：500台）")
-out.append("INSERT INTO production_plans (target_week, product_id, qty, note) VALUES")
-out.append(f"  (DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), {PRODUCT_ID}, 500, '動作確認用');")
+out.append("-- 今日の生産計画（動作確認用：500台）")
+out.append("INSERT INTO production_plans (target_date, product_id, qty, note) VALUES")
+out.append(f"  (CURDATE(), {PRODUCT_ID}, 500, '動作確認用');")
 out.append("")
 
 out.append("-- 在庫（動作確認用のデモ値。実際の数量は棚卸し画面で入力してください）")

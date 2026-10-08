@@ -63,7 +63,7 @@ a{color:var(--navy-l)}
 /* ---------- レイアウト ---------- */
 .layout{display:flex; min-height:calc(100vh - 140px); align-items:stretch}
 .sidemenu{
-  width:250px; flex:0 0 250px; background:#fff;
+  width:360px; flex:0 0 360px; background:#fff;
   border-right:1px solid var(--line); padding:0;
   position:sticky; top:var(--topbar-h); align-self:flex-start;
   max-height:calc(100vh - var(--topbar-h)); overflow-y:auto;
@@ -152,6 +152,7 @@ a{color:var(--navy-l)}
 
 /* ---------- 表 ---------- */
 .table{width:100%; border-collapse:collapse; background:#fff; font-size:14px}
+.table-narrow{width:auto; min-width:320px}
 .table th,.table td{border:1px solid var(--line); padding:8px 10px; text-align:left}
 .table thead th{background:var(--navy); color:#fff; white-space:nowrap}
 .table tbody th{background:var(--blue); color:var(--navy); width:140px; white-space:nowrap}
@@ -261,3 +262,115 @@ input[type=text],input[type=number],input[type=date],textarea,select{
 .kanban-body{font-size:13px; color:#444; margin:2px 0 6px}
 .kanban-label{display:block; font-size:12px; color:var(--gray)}
 .kanban-empty{color:var(--gray); font-size:13px; text-align:center; padding:10px}
+
+/* 達成度バー（左メニュー・発注一覧） */
+.bar{display:inline-block; width:90px; height:6px; background:#E4E8EF; border-radius:3px; overflow:hidden; vertical-align:middle; margin-right:4px}
+.bar-fill{display:block; height:100%; background:var(--green)}
+.flow-body .bar{display:block; width:100%; margin:4px 0 0}
+
+/* 期間・日の選択 */
+.range-pick{margin-left:auto; display:flex; align-items:center; gap:6px; font-size:13px; flex-wrap:wrap}
+.chip{display:inline-block; background:#EEF2F8; border-radius:10px; padding:1px 8px; font-size:12px; margin:1px 2px}
+.carry{color:#8a6100; font-size:12px}
+
+/* スケジュール（週カレンダー） */
+.w-60{width:60px}
+
+/* スケジュール（発注ごとのガントチャート） */
+.gantt-legend{font-size:12px; display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px}
+.gantt-legend .b{padding:3px 8px; min-width:0; width:auto}
+.gantt-wrap{overflow-x:auto; background:#fff; border:1px solid var(--line); border-radius:8px}
+.gantt{border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; font-size:13px}
+.gantt th,.gantt td{border-bottom:1px solid var(--line); border-right:1px solid #EEF1F5; padding:4px 6px; vertical-align:middle}
+.gantt th.g-label,.gantt td.g-label{position:sticky; left:0; background:#fff; width:320px; min-width:320px; text-align:left; z-index:1; border-right:2px solid var(--line)}
+.gantt thead th{background:#F4F6FA; text-align:center; font-size:12px; line-height:1.2; padding:6px 2px}
+.gantt thead th.weekend{background:#EEF0F4; color:var(--gray)}
+.gantt thead th.today{background:#FFF3C4; color:#6b4a00}
+.gantt td.g-cell{height:30px; padding:2px 1px; text-align:center}
+.gantt td.g-cell.today{background:#FFFBEA}
+.gantt .g-head td{background:#F7F9FC; font-weight:bold}
+.gantt .g-head td.g-label{background:#F7F9FC}
+.gantt .g-head .g-cell{height:34px}
+.gantt tbody.g-closed .g-title{color:var(--gray)}
+.gantt tbody.collapsed .g-part,.gantt tbody.collapsed .g-po,.gantt tbody.collapsed .g-edit{display:none}
+.g-toggle{border:none; background:none; cursor:pointer; color:var(--navy); font-size:12px; padding:0 4px}
+.g-title{font-size:14px; color:var(--navy)}
+.g-sub{display:block; font-weight:normal; font-size:12px; color:var(--gray); margin-left:20px}
+.g-rate{display:block; font-weight:normal; font-size:12px; margin-left:20px; color:var(--navy)}
+.g-rate .bar{width:120px}
+.g-links{display:block; font-weight:normal; font-size:12px; margin-left:20px}
+.g-links a{margin-right:10px}
+.g-part .g-label{padding-left:26px}
+.g-part-name{font-weight:bold}
+.g-po .g-label{padding-left:26px; background:#FAF8FF}
+.g-po .g-label a{color:#5a3fa8}
+.g-late{background:var(--red-bg); color:var(--red)}
+.gantt .g-empty{padding:24px; text-align:center; color:var(--gray)}
+.b{display:inline-block; border-radius:4px; font-size:11px; line-height:1; padding:5px 4px; color:#fff; white-space:nowrap; text-decoration:none; box-sizing:border-box}
+.week-bar .btn{white-space:nowrap}
+.gantt td.g-cell .b{width:100%; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.b.plan{background:#9fb3d1; color:#123}
+.b.span{background:#E3E9F3; color:#E3E9F3; height:8px; padding:0; border-radius:0; margin-top:10px}
+.b.doing{background:#f0a83a; color:#3a2600}
+.b.done{background:#3a9d5d}
+.b.deliv{background:#1f3a5f}
+.b.deliv.light{background:#4a6a99}
+.b.po{background:#7a5cc4; border-radius:0}
+.b.po.st{border-radius:4px 0 0 4px} .b.po.en{border-radius:0 4px 4px 0} .b.po.st.en{border-radius:4px}
+.b.late{background:#d14b4b}
+.gantt-form{display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:13px}
+.gantt-form label{display:inline-flex; gap:4px; align-items:center}
+.gantt-form input,.gantt-form select{font-size:13px}
+.g-edit td{background:#FFFBEA}
+.g-inline{display:flex; gap:4px; align-items:center; flex-wrap:wrap; font-size:12px}
+.g-inline select,.g-inline input{font-size:12px}
+@media (max-width:1100px){ .gantt th.g-label,.gantt td.g-label{width:240px; min-width:240px} }
+
+/* 左メニュー：発注ごとツリー／業務の流れ のタブ */
+.side-tabs{display:flex; position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid var(--line)}
+.side-tab{flex:1 1 0; border:0; background:#F4F6FA; padding:9px 4px; font-size:13px; cursor:pointer; color:var(--gray); border-bottom:3px solid transparent}
+.side-tab.active{background:#fff; color:var(--navy); font-weight:bold; border-bottom-color:var(--navy)}
+.tree{padding:0 0 12px; font-size:12px}
+.tree-head{padding:10px 12px 6px; font-weight:bold; color:var(--navy)}
+.tree-empty,.tree-note{padding:6px 12px; color:var(--gray); font-size:11px}
+.tree details > summary{list-style:none; cursor:pointer; position:relative}
+.tree details > summary::-webkit-details-marker{display:none}
+.tree details > summary::before{content:'▶'; position:absolute; left:2px; top:7px; font-size:9px; color:var(--gray)}
+.tree details[open] > summary::before{content:'▼'}
+.tree-node{margin:0}
+.tree-job{border-top:1px solid var(--line)}
+.tree-job > summary{padding-left:12px; background:#F8F9FC}
+.tree-item{margin-left:14px}
+.tree-item > summary{padding-left:12px}
+.tree-part{margin-left:14px}
+.tree-part > summary{padding-left:12px}
+.tree-more{margin-left:14px}
+.tree-more > summary{padding:4px 0 4px 14px; color:var(--green); font-size:11px}
+.tree-mat{margin-left:14px}
+.tree-part > .tree-note{margin-left:14px}
+.tree-row{display:flex; flex-wrap:wrap; align-items:center; gap:2px 6px; padding:5px 8px 5px 4px; color:inherit; text-decoration:none; border-left:3px solid transparent}
+a.tree-row:hover{background:var(--blue)}
+.tree-row.here{background:var(--blue); border-left-color:var(--navy)}
+.tree-row.here .tree-name{color:var(--navy)}
+.tree-name{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.tree-job > summary .tree-name{font-weight:bold; flex-basis:100%}
+.tree-item > summary .tree-name{font-weight:bold}
+.tree-info{font-size:11px; color:var(--gray); white-space:nowrap}
+.tree-late{color:var(--red); font-weight:bold}
+.tree-rate{display:inline-flex; align-items:center; gap:4px; font-size:11px; margin-left:auto}
+.tree-rate .bar{width:60px; margin:0}
+.tree-badge{font-size:10px; border-radius:9px; padding:0 6px; white-space:nowrap}
+.tj-short,.ts-late{background:#FDE8E8; color:var(--red); font-weight:bold}
+.tj-ordered{background:#EFE7FB; color:#5B3A9A}
+.tj-ok,.ts-done{background:var(--green-bg); color:var(--green)}
+.ts-doing{background:#FFF0DD; color:#A65E00}
+.ts-todo{background:#E8EEF7; color:#3F5C86}
+
+/* スケジュール：作る商品の行 */
+.gantt tr.g-item td.g-label{padding-left:22px; background:#FBFCFE}
+.g-item-name{font-weight:bold; color:var(--navy)}
+.add-items{margin:6px 0}
+.add-items td{padding:3px 6px}
+
+/* 材料の在庫の見込み */
+.proj td.minus{color:var(--red); font-weight:bold}

@@ -33,3 +33,8 @@ $v = static fn(string $key) => View::e($product[$key] ?? '');
     <a class="btn btn-plain" href="<?= View::e(App::url($isNew ? '/products' : '/products/show?id=' . $product['id'])) ?>">やめる</a>
   </div>
 </form>
+
+<?php if (!$isNew):
+    $deleteAction = '/products/delete'; $deleteId = (int)$product['id']; $deleteLabel = 'この商品';
+    require __DIR__ . '/../_parts/delete_box.php';
+endif; ?>

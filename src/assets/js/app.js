@@ -150,3 +150,35 @@ document.addEventListener('click', function (e) {
     document.querySelectorAll('select.select-search').forEach(enhance);
   });
 })();
+
+// 左メニューのタブ（発注ごと／業務の流れ）と、ツリーの開閉を覚えておく
+(function () {
+  var tabs = document.querySelectorAll('.side-tab');
+  if (!tabs.length) { return; }
+  function show(name) {
+    tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+    document.querySelectorAll('.side-pane').forEach(function (p) { p.hidden = p.dataset.pane !== name; });
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('sideTab'); } catch (e) {}
+  if (saved === 'flow' && document.querySelector('.side-pane[data-pane="flow"]')) { show('flow'); }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      show(t.dataset.tab);
+      try { localStorage.setItem('sideTab', t.dataset.tab); } catch (e) {}
+    });
+  });
+
+  var state = {};
+  try { state = JSON.parse(sessionStorage.getItem('treeOpen') || '{}'); } catch (e) { state = {}; }
+  document.querySelectorAll('.tree details[data-key]').forEach(function (d) {
+    var k = d.dataset.key;
+    if (d.dataset.here !== '1' && Object.prototype.hasOwnProperty.call(state, k)) { d.open = state[k]; }
+    d.addEventListener('toggle', function () {
+      state[k] = d.open;
+      try { sessionStorage.setItem('treeOpen', JSON.stringify(state)); } catch (e) {}
+    });
+  });
+  var here = document.querySelector('.tree .tree-row.here');
+  if (here && here.scrollIntoView) { here.scrollIntoView({block: 'nearest'}); }
+})();

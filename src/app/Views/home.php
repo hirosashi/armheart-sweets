@@ -10,7 +10,7 @@ $title = 'ホーム';
 <div class="card-grid">
   <a class="card" href="<?= View::e(App::url('/require')) ?>">
     <div class="card-head">🧮 必要な材料と足りない分</div>
-    <div class="card-body">今週つくる数を入れると、材料が何をどれだけ買えばよいかがわかります。</div>
+    <div class="card-body">スケジュールで登録した発注（つくる予定）から、材料が何をどれだけ買えばよいかがわかります。</div>
   </a>
   <a class="card" href="<?= View::e(App::url('/orders')) ?>">
     <div class="card-head">📨 発注の管理</div>
@@ -42,8 +42,8 @@ $title = 'ホーム';
     <tr><th>商品</th><td><?= (int)$counts['products'] ?> 件</td></tr>
     <tr><th>パーツ</th><td><?= (int)$counts['parts'] ?> 件</td></tr>
     <tr><th>材料</th><td><?= (int)$counts['materials'] ?> 件</td></tr>
-    <tr><th>業者</th><td><?= (int)$counts['suppliers'] ?> 件</td></tr>
-    <tr><th>今週（月曜日から）</th><td><?= View::e(View::d($week_start)) ?> の週</td></tr>
+    <tr><th>仕入先</th><td><?= (int)$counts['suppliers'] ?> 件</td></tr>
+    <tr><th>今日</th><td><?= View::e(View::d($week_start)) ?>（<a href="<?= View::e(App::url('/schedule')) ?>">今週のスケジュールを見る</a>）</td></tr>
   </tbody>
 </table>
 

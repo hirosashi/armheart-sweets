@@ -7,21 +7,19 @@ description: 開発サーバ（さくら jyunbi.sakura.ne.jp/armheart.com）へ 
 
 ## 前提
 - プロジェクト: `/home/ubuntu/phase1_dev`
-- 反映スクリプト: `deploy.sh`（`src/` を tar→scp→ssh で展開。`config.local.php`・`install.php`・ログは除外）
+- 反映スクリプト: `deploy.sh`（`src/` を tar→scp→ssh で展開。環境別設定 `config.local/sakura/production.php`・`install.php`・ログは除外）
 - SFTP: host `jyunbi.sakura.ne.jp` / port 22 / user `jyunbi` / 配置先 `/home/jyunbi/www/armheart.com`
-- パスワードは **添付「開発環境.txt」の4行目** `Password = "..."` にある。値を会話・ログ・ソースに出力しないこと。
+- パスワードは組織 secret **`ARMHEART_SFTP_PASS`**（exec の `env` に `secret:session:ARMHEART_SFTP_PASS` で束縛）。添付「開発環境.txt」の値は古く認証に失敗する。値を会話・ログ・ソースに出力しないこと。
 - 確認URLは `https://jyunbi.sakura.ne.jp/armheart.com/`（`sakura.jp` は名前解決不可）
 
 ## 手順
 1. 反映前にローカル検査（`verify-changes` スキル）を通す。
 2. パスワードを環境変数へ読み込み、デプロイ実行（1コマンドで）:
    ```bash
-   cd /home/ubuntu/phase1_dev && \
-   export SFTP_PASS="$(sed -n '4p' ~/attachments/*/開発環境.txt | sed -E 's/^Password = "//; s/",?\s*$//' | tr -d '\r')" && \
-   ./deploy.sh
+   # exec の env に {"SFTP_PASS": "secret:session:ARMHEART_SFTP_PASS"} を指定して実行
+   cd /home/ubuntu/phase1_dev && ./deploy.sh
    ```
-   - `Permission denied` が出たら抽出結果を `echo ${#SFTP_PASS}`（長さのみ）で確認する。値は表示しない。
-   - 添付ファイルが無い場合は `request_secret`（SFTP_JYUNBI_PASSWORD）で3択提示。
+   - `Permission denied` が出たら secret が未登録／変更されている。`request_secret`（ARMHEART_SFTP_PASS, org スコープ）で再登録を依頼する。
 3. DBスキーマ変更を伴う場合は `apply-db-schema` スキルで開発サーバDBにも適用する。
 4. 疎通確認（未ログインは 302、静的ファイルは 200）:
    ```bash
@@ -41,4 +39,5 @@ description: 開発サーバ（さくら jyunbi.sakura.ne.jp/armheart.com）へ 
 
 ## 注意
 - `.htaccess`（`src/.htaccess`, `src/app/.htaccess`）は削除・除外しない（内部フォルダ保護）。
-- `config/config.sakura.php` は開発サーバ側に既にあるもの。上書きしてよいが、内容を会話に出さない。
+- `config/config.sakura.php` は開発サーバ側に置いてあるものが使われる（`deploy.sh` は転送しない）。内容を会話に出さない。
+- 本番への反映は `deploy-prod-server` スキル（`./deploy.sh prod`）。

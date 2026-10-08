@@ -94,3 +94,8 @@ $total = (float)$qty_sum;
   <?php endif; ?>
   </tbody>
 </table>
+
+<?php if ($editable):
+    $deleteAction = '/parts/delete'; $deleteId = (int)$part['id']; $deleteLabel = 'この部位';
+    require __DIR__ . '/../_parts/delete_box.php';
+endif; ?>
