@@ -38,7 +38,9 @@ $statusClass = ['draft' => 'judge-short', 'ordered' => 'judge-tight', 'partial' 
       <td class="<?= View::e($statusClass[$o['status']] ?? '') ?>"><?= View::e(OrderController::STATUS_LABELS[$o['status']] ?? $o['status']) ?></td>
       <td>
         <a class="btn btn-plain" href="<?= View::e(App::url('/orders/show?id=' . $o['id'])) ?>">内容</a>
+        <?php if (trim((string)$o['vendor_name']) !== ''): ?>
         <a class="btn btn-plain" href="<?= View::e(App::url('/orders/print?id=' . $o['id'])) ?>" target="_blank">発注書</a>
+        <?php endif; ?>
       </td>
     </tr>
   <?php endforeach; ?>

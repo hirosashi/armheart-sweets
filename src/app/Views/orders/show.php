@@ -19,8 +19,12 @@ $receivedCount = count(array_filter($items, fn($i) => (float)$i['received_qty'] 
   <?php endif; ?></h1>
 <p class="page-lead">
   <a href="<?= View::e(App::url('/orders')) ?>">← 発注の一覧へ</a>
+  <?php if (trim((string)$order['vendor_name']) !== ''): ?>
   　<a class="btn" href="<?= View::e(App::url('/orders/print?id=' . $order['id'])) ?>" target="_blank">発注書を印刷する</a>
   <span class="note">印刷画面から「PDFに保存」も選べます。</span>
+  <?php else: ?>
+  　<span class="note">発注書を印刷するには、下の「発注先」を入れて保存してください。</span>
+  <?php endif; ?>
 </p>
 
 <form method="post" action="<?= View::e(App::url('/orders/save')) ?>">

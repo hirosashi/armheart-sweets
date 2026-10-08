@@ -86,6 +86,10 @@ class OrderController
         if (!$order) {
             App::redirect('/orders');
         }
+        if (trim((string)$order['vendor_name']) === '') {
+            Session::flash('warn', '発注先が入っていないため、発注書を印刷できません。発注先を入れて保存してください。');
+            App::redirect('/orders/show?id=' . $id);
+        }
 
         View::render('orders/print', [
             'order' => $order,

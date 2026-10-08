@@ -24,11 +24,9 @@ foreach ($items as $i) {
   <h1 class="doc-title">発 注 書</h1>
   <div class="doc-head">
     <div class="doc-left">
-      <div class="to"><?= View::e($order['vendor_name'] ?: $order['supplier_name']) ?>　御中</div>
+      <div class="to"><?= View::e($order['vendor_name']) ?>　御中</div>
       <table class="head-table">
-        <?php if (!empty($order['vendor_name'])): ?>
         <tr><th>メーカー</th><td><?= View::e($order['supplier_name']) ?></td></tr>
-        <?php endif; ?>
         <tr><th>希望納期</th><td><?= View::e(Clock::d($order['desired_date'])) ?></td></tr>
         <tr><th>納品場所</th><td><?= View::e($order['delivery_place']) ?></td></tr>
       </table>
