@@ -374,3 +374,28 @@ a.tree-row:hover{background:var(--blue)}
 
 /* 材料の在庫の見込み */
 .proj td.minus{color:var(--red); font-weight:bold}
+
+/* 原材料発注一覧（かんたん画面） */
+.mainmenu-easy{background:var(--yellow-bg); color:#5a4300 !important; font-weight:bold; border-radius:4px}
+.mainmenu-easy:hover{background:#FFF3A0 !important}
+.easy-band{background:var(--yellow-bg); border:1px solid var(--yellow); color:#5a4300; border-radius:6px; padding:8px 14px; margin:0 0 14px; font-size:14px; font-weight:bold}
+.easy-band a{font-weight:normal; margin-left:12px}
+.sheet-top{display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 12px}
+.sheet-top .page-title{margin:0 12px 0 0}
+.sheet-wrap{overflow-x:auto}
+.table.sheet{font-size:13px}
+.table.sheet th,.table.sheet td{padding:4px 6px; white-space:nowrap}
+.table.sheet td.in,.sheet-top input.in{background:#FFF7CC}
+.table.sheet td.in input,.table.sheet td.in select{background:#FFFDF0; border:1px solid #E0C860; padding:3px 4px}
+.table.sheet td.auto{background:#F2F2F2; color:#333}
+.table.sheet td.done{background:var(--green-bg)}
+.table.sheet tr.row-main td{border-top:2px solid #C9D3E3}
+.table.sheet tr.row-split td{border-top:1px dashed #DDD}
+.table.sheet td.part-name{font-weight:bold; color:var(--navy); background:#fff}
+.table.sheet tr.row-add td{background:#FAFAFA}
+fieldset.plain{border:0; padding:0; margin:0; min-width:0}
+.legend{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:12px 0}
+.legend .lg{padding:2px 10px; border:1px solid var(--line); border-radius:4px; font-size:12px}
+.legend .lg.in{background:#FFF7CC}
+.legend .lg.auto{background:#F2F2F2}
+.legend .lg.done{background:var(--green-bg)}

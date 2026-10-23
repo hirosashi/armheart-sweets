@@ -43,6 +43,15 @@ $kind = $material['kind'] ?? 'material';
       <?php endforeach; ?>
     </select>
   </label>
+  <label>発注先（いつも発注する商社）<input type="text" name="vendor_name" value="<?= $v('vendor_name') ?>" class="w-300" maxlength="100"></label>
+  <label>保管配送
+    <select name="storage">
+      <option value="">-- 未設定 --</option>
+      <?php foreach (\App\Services\OrderSheet::STORAGES as $st): ?>
+        <option value="<?= View::e($st) ?>" <?= ($material['storage'] ?? '') === $st ? 'selected' : '' ?>><?= View::e($st) ?></option>
+      <?php endforeach; ?>
+    </select>
+  </label>
   <label>荷姿<input type="text" name="purchase_unit" value="<?= $v('purchase_unit') ?>" class="w-100" placeholder="袋／本／ケース"></label>
   <label>荷姿あたりの数量<input type="number" step="0.001" name="purchase_qty" value="<?= $v('purchase_qty') ?>" class="w-100" placeholder="例：25000"> <span class="note">例：1袋＝25000g なら 25000</span></label>
 

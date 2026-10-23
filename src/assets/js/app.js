@@ -182,3 +182,39 @@ document.addEventListener('click', function (e) {
   var here = document.querySelector('.tree .tree-row.here');
   if (here && here.scrollIntoView) { here.scrollIntoView({block: 'nearest'}); }
 })();
+
+// 原材料発注一覧：「＋分けて発注」で発注の行を1つ足す
+(function () {
+  var seq = 0;
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.js-split') : null;
+    if (!btn) { return; }
+    var key = btn.getAttribute('data-key');
+    var rows = Array.prototype.filter.call(document.querySelectorAll('tr[data-key]'), function (r) { return r.getAttribute('data-key') === key; });
+    if (!rows.length) { return; }
+    var main = rows[0], last = rows[rows.length - 1];
+    var cells = Array.prototype.slice.call(main.cells);
+    var lead = -1;
+    cells.forEach(function (td, i) {
+      var inp = td.querySelector('input[name$="[qty]"]');
+      if (lead < 0 && inp && /^(new_)?order\[/.test(inp.name)) { lead = i; }
+    });
+    if (lead < 0) { return; }
+    seq++;
+    var base = 'new_order[' + key + '][s' + seq + ']';
+    var tr = document.createElement('tr');
+    tr.className = 'row-split';
+    tr.setAttribute('data-key', key);
+    var html = '';
+    for (var i = 0; i < lead; i++) { html += i === lead - 1 && lead > 1 ? '<td class="small">（分けて発注）</td>' : '<td></td>'; }
+    html += '<td class="in num"><input type="number" step="any" min="0" name="' + base + '[qty]" class="w-80"></td>';
+    html += '<td class="auto"></td>';
+    html += '<td class="in"><input type="date" name="' + base + '[order_date]"></td>';
+    html += '<td class="in"><input type="date" name="' + base + '[desired_date]"></td>';
+    html += '<td class="in text-center"><label><input type="checkbox" name="' + base + '[done]" value="1"> 済</label></td>';
+    for (var j = lead + 5; j < cells.length; j++) { html += '<td></td>'; }
+    tr.innerHTML = html;
+    last.parentNode.insertBefore(tr, last.nextSibling);
+    tr.querySelector('input').focus();
+  });
+})();

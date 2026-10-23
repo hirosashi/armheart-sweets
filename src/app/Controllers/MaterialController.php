@@ -10,6 +10,7 @@ use App\Core\Session;
 use App\Core\Validator;
 use App\Core\View;
 use App\Services\MasterDelete;
+use App\Services\OrderSheet;
 
 class MaterialController
 {
@@ -98,7 +99,7 @@ class MaterialController
 
         $id     = (int)($_POST['id'] ?? 0);
         $fields = ['name', 'alias_names', 'category', 'maker_name', 'allergens',
-                   'purchase_unit', 'note'];
+                   'purchase_unit', 'vendor_name', 'note'];
         $data = [];
         foreach ($fields as $f) {
             $value = trim((string)($_POST[$f] ?? ''));
@@ -111,6 +112,7 @@ class MaterialController
         $isSupplied  = isset($_POST['is_supplied']) ? 1 : 0;
         $isStock     = isset($_POST['is_stock_managed']) ? 1 : 0;
         $hasExpiry   = isset($_POST['has_expiry']) ? 1 : 0;
+        $storage     = in_array($_POST['storage'] ?? '', OrderSheet::STORAGES, true) ? (string)$_POST['storage'] : null;
 
         $v = (new Validator())
             ->required($data['name'], '材料名')
@@ -125,14 +127,14 @@ class MaterialController
         $params = [
             $data['name'], $data['alias_names'], $kind, $data['category'], $data['maker_name'], $data['allergens'],
             $unit, $data['purchase_unit'], $purchaseQty,
-            $supplierId, $isSupplied, $isStock, $hasExpiry, $data['note'],
+            $supplierId, $isSupplied, $isStock, $hasExpiry, $data['note'], $data['vendor_name'], $storage,
         ];
 
         if ($id > 0) {
             Db::exec(
                 'UPDATE materials SET name=?, alias_names=?, kind=?, category=?, maker_name=?, allergens=?,
                         unit=?, purchase_unit=?, purchase_qty=?,
-                        supplier_id=?, is_supplied=?, is_stock_managed=?, has_expiry=?, note=?, updated_by=?
+                        supplier_id=?, is_supplied=?, is_stock_managed=?, has_expiry=?, note=?, vendor_name=?, storage=?, updated_by=?
                   WHERE id = ?',
                 [...$params, Auth::id(), $id]
             );
@@ -142,8 +144,8 @@ class MaterialController
             $id = Db::insert(
                 'INSERT INTO materials (name, alias_names, kind, category, maker_name, allergens,
                         unit, purchase_unit, purchase_qty,
-                        supplier_id, is_supplied, is_stock_managed, has_expiry, note, created_by)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                        supplier_id, is_supplied, is_stock_managed, has_expiry, note, vendor_name, storage, created_by)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [...$params, Auth::id()]
             );
             OperationLog::write('create', 'materials', (string)$id, '材料を登録しました：' . $data['name']);

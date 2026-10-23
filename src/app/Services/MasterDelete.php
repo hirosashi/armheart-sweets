@@ -81,7 +81,7 @@ class MasterDelete
             "SELECT DISTINCT o.order_no, s.name AS supplier_name
                FROM purchase_order_items i
                JOIN purchase_orders o ON o.id = i.order_id
-               JOIN suppliers s ON s.id = o.supplier_id
+               LEFT JOIN suppliers s ON s.id = o.supplier_id
               WHERE i.material_id = ? AND o.deleted_at IS NULL
                 AND o.status IN ('draft','ordered','partial')
               ORDER BY o.order_no",
