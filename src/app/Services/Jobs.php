@@ -172,25 +172,28 @@ class Jobs
         );
     }
 
-    /** 商品・台数から部位ごとの仕込み回数を計算する（Requirement と同じ式） */
+    /** 商品・台数から部位ごとの仕込み回数を計算する（Requirement と同じ式。「1Bでできる数」があれば台数÷その数の切り上げ） */
     public static function batchesFor(int $productId, int $qty): array
     {
         return Db::all(
             'SELECT p.id AS part_id, p.name, p.unit, p.batch_total_qty,
                     pn.need_qty,
-                    CASE WHEN p.round_batch = 1
+                    CASE WHEN pn.batch_pieces > 0
+                         THEN CEILING(? / pn.batch_pieces)
+                         WHEN p.round_batch = 1
                          THEN CEILING(pn.need_qty / p.yield_rate / p.batch_total_qty)
                          ELSE ROUND(pn.need_qty / p.yield_rate / p.batch_total_qty, 3)
                     END AS batches
                FROM (SELECT pp.part_id,
-                            SUM(? * (pp.fill_qty / pp.pieces_per_fill * pp.use_pieces)) AS need_qty
+                            SUM(? * (pp.fill_qty / pp.pieces_per_fill * pp.use_pieces)) AS need_qty,
+                            MAX(pp.batch_pieces) AS batch_pieces
                        FROM product_parts pp
                       WHERE pp.product_id = ?
                       GROUP BY pp.part_id) pn
                JOIN parts p ON p.id = pn.part_id
               WHERE p.batch_total_qty > 0 AND p.deleted_at IS NULL
               ORDER BY p.name',
-            [$qty, $productId]
+            [$qty, $qty, $productId]
         );
     }
 
@@ -299,7 +302,7 @@ class Jobs
                     (SELECT COUNT(*) FROM purchase_order_items i WHERE i.order_id = o.id) AS item_count,
                     (SELECT COUNT(*) FROM purchase_order_items i WHERE i.order_id = o.id AND i.received_qty >= i.qty AND i.qty > 0) AS received_count
                FROM purchase_orders o
-               JOIN suppliers s ON s.id = o.supplier_id
+               LEFT JOIN suppliers s ON s.id = o.supplier_id
               WHERE o.deleted_at IS NULL AND o.status <> 'canceled' AND o.job_id IN ($ph)
               ORDER BY o.job_id, o.order_date, o.id",
             $jobIds

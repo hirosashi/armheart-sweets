@@ -41,7 +41,7 @@ class OrderController
             "SELECT o.*, s.name AS supplier_name, c.name AS company_name,
                     (SELECT COUNT(*) FROM purchase_order_items i WHERE i.order_id = o.id) AS item_count
                FROM purchase_orders o
-               JOIN suppliers s ON s.id = o.supplier_id
+               LEFT JOIN suppliers s ON s.id = o.supplier_id
           LEFT JOIN companies c ON c.id = o.company_id
               WHERE {$where}
               ORDER BY o.order_date DESC, o.id DESC",
@@ -247,7 +247,7 @@ class OrderController
             'SELECT o.*, s.name AS supplier_name, c.name AS company_name, c.zip AS company_zip,
                     c.address AS company_address, c.tel AS company_tel, c.fax AS company_fax
                FROM purchase_orders o
-               JOIN suppliers s ON s.id = o.supplier_id
+               LEFT JOIN suppliers s ON s.id = o.supplier_id
           LEFT JOIN companies c ON c.id = o.company_id
               WHERE o.id = ? AND o.deleted_at IS NULL',
             [$id]

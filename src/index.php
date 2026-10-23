@@ -16,6 +16,7 @@ use App\Controllers\ProductController;
 use App\Controllers\ProgressController;
 use App\Controllers\RequireController;
 use App\Controllers\ScheduleController;
+use App\Controllers\SheetController;
 use App\Controllers\StockController;
 
 $router = new Router();
@@ -31,6 +32,13 @@ $router->get('/menu',    [HomeController::class, 'index']);
 // パスワード変更
 $router->get('/password',  [AuthController::class, 'showPassword']);
 $router->post('/password', [AuthController::class, 'changePassword']);
+
+// 原材料発注一覧（Excelと同じ並びのかんたん画面）
+$router->get('/sheets',         [SheetController::class, 'index']);
+$router->post('/sheets/create', [SheetController::class, 'create']);
+$router->get('/sheets/show',    [SheetController::class, 'show']);
+$router->post('/sheets/save',   [SheetController::class, 'save']);
+$router->get('/sheets/export',  [SheetController::class, 'export']);
 
 // 商品と配合
 $router->get('/products',           [ProductController::class, 'index']);

@@ -84,6 +84,7 @@ $flowHref = static function (array $step): string {
 
   <?php if (Auth::check()): ?>
   <nav class="mainmenu">
+    <a class="mainmenu-item mainmenu-easy<?= str_starts_with(rtrim($current, '/'), rtrim(App::url('/sheets'), '/')) ? ' active' : '' ?>" href="<?= View::e(App::url('/sheets')) ?>">原材料発注一覧（かんたん）</a>
     <?php foreach ($menuWork as $m): ?>
       <a class="mainmenu-item<?= $isActive($m['path']) ? ' active' : '' ?>" href="<?= View::e(App::url($m['path'])) ?>"><?= View::e($m['label']) ?></a>
     <?php endforeach; ?>

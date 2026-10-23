@@ -109,6 +109,8 @@ CREATE TABLE materials (
   price_source    VARCHAR(100) NULL COMMENT '単価の根拠（例:2026.05.25納品書）',
   price_date      DATE         NULL COMMENT '単価の適用日',
   supplier_id     INT UNSIGNED NULL COMMENT '主な業者',
+  vendor_name     VARCHAR(100) NULL COMMENT '発注先（いつも発注する商社）',
+  storage         VARCHAR(10)  NULL COMMENT '保管配送（冷凍/冷蔵/常温）',
   is_supplied     TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '支給品（取引先から支給される）',
   is_stock_managed TINYINT(1)  NOT NULL DEFAULT 1 COMMENT '在庫・発注の対象にする（水などは0）',
   has_expiry      TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '賞味期限管理する',
@@ -186,6 +188,7 @@ CREATE TABLE product_parts (
   fill_unit   VARCHAR(20)  NOT NULL DEFAULT 'g' COMMENT '充填量の単位',
   pieces_per_fill SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '取り数（充填量から何個取れるか）',
   use_pieces  SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '1台に使う個数',
+  batch_pieces DECIMAL(12,3) NULL COMMENT '1Bでできる数（原材料発注一覧で使う）',
   note        VARCHAR(255) NULL COMMENT '例:1.5cm厚2枚取り1枚使用',
   sort_no     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -355,7 +358,7 @@ CREATE TABLE purchase_orders (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
   order_no      VARCHAR(30)  NOT NULL COMMENT '発注番号',
   company_id    INT UNSIGNED NULL COMMENT '発注者（自社。画面では選ばず既定の自社）',
-  supplier_id   INT UNSIGNED NOT NULL COMMENT 'メーカー',
+  supplier_id   INT UNSIGNED NULL COMMENT 'メーカー',
   vendor_name   VARCHAR(100) NULL COMMENT '発注先（実際に発注する商社）',
   delivery_place VARCHAR(255) NULL COMMENT '納品場所',
   status        ENUM('draft','ordered','partial','delivered','canceled') NOT NULL DEFAULT 'draft' COMMENT '未発注/発注済/一部納品/納品済/取消',
@@ -363,6 +366,8 @@ CREATE TABLE purchase_orders (
   period_from   DATE         NULL COMMENT '対象期間（この日から）',
   period_to     DATE         NULL COMMENT '対象期間（この日まで）',
   job_id        INT UNSIGNED NULL COMMENT 'どの発注（つくる予定）のぶんか',
+  sheet_id      INT UNSIGNED NULL COMMENT 'どの原材料発注一覧のぶんか',
+  sheet_part_id INT UNSIGNED NULL COMMENT '原材料発注一覧のどの部位のぶんか（資材はNULL）',
   desired_date  DATE         NULL COMMENT '希望納品日',
   delivered_date DATE        NULL COMMENT '納品日',
   subtotal      DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '小計(税抜)',
@@ -377,6 +382,7 @@ CREATE TABLE purchase_orders (
   PRIMARY KEY (id),
   UNIQUE KEY uq_po_order_no (order_no),
   KEY idx_po_status (status, order_date),
+  KEY idx_po_sheet (sheet_id),
   CONSTRAINT fk_po_company  FOREIGN KEY (company_id)  REFERENCES companies(id),
   CONSTRAINT fk_po_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='発注';
@@ -401,6 +407,34 @@ CREATE TABLE purchase_order_items (
   CONSTRAINT fk_poi_order    FOREIGN KEY (order_id)    REFERENCES purchase_orders(id) ON DELETE CASCADE,
   CONSTRAINT fk_poi_material FOREIGN KEY (material_id) REFERENCES materials(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='発注明細';
+
+CREATE TABLE order_sheets (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  product_id  INT UNSIGNED NOT NULL,
+  qty         INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '製造数',
+  note        VARCHAR(255) NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by  INT UNSIGNED NULL,
+  updated_by  INT UNSIGNED NULL,
+  deleted_at  DATETIME NULL,
+  PRIMARY KEY (id),
+  KEY idx_os_product (product_id),
+  CONSTRAINT fk_os_product FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='原材料発注一覧（商品＋製造数ごと）';
+
+CREATE TABLE order_sheet_packs (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  sheet_id    INT UNSIGNED NOT NULL,
+  material_id INT UNSIGNED NOT NULL,
+  purpose     VARCHAR(100) NULL COMMENT '使用用途',
+  use_qty     DECIMAL(12,3) NULL COMMENT '使用数',
+  sort_no     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_osp (sheet_id, material_id),
+  CONSTRAINT fk_osp_sheet    FOREIGN KEY (sheet_id)    REFERENCES order_sheets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_osp_material FOREIGN KEY (material_id) REFERENCES materials(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='原材料発注一覧の資材関連';
 
 -- ============================================================
 -- 7. 製造による材料使用（できあがり時に在庫から自動で引いた記録）

@@ -46,7 +46,7 @@ class Orders
                     COUNT(i.id) AS item_count,
                     IFNULL(SUM(i.received_qty >= i.qty), 0) AS received_count
                FROM purchase_orders o
-               JOIN suppliers s ON s.id = o.supplier_id
+               LEFT JOIN suppliers s ON s.id = o.supplier_id
           LEFT JOIN purchase_order_items i ON i.order_id = o.id
               WHERE o.deleted_at IS NULL AND o.status IN ('draft','ordered','partial')
               GROUP BY o.id

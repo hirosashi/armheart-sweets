@@ -82,6 +82,8 @@ class MasterIo
                 ['h' => '荷姿',                     'c' => 'purchase_unit',     't' => 'str', 'max' => 20],
                 ['h' => '荷姿あたりの数量',         'c' => 'purchase_qty',      't' => 'dec'],
                 ['h' => '仕入先名',                 'c' => 'supplier_id',       't' => 'ref', 'ref' => 'suppliers'],
+                ['h' => '発注先',                   'c' => 'vendor_name',       't' => 'str', 'max' => 100],
+                ['h' => '保管配送',                 'c' => 'storage',           't' => 'str', 'max' => 10],
                 ['h' => '支給品',                   'c' => 'is_supplied',       't' => 'bool', 'default' => 0],
                 ['h' => '在庫管理',                 'c' => 'is_stock_managed',  't' => 'bool', 'default' => 1],
                 ['h' => '賞味期限の管理',           'c' => 'has_expiry',        't' => 'bool', 'default' => 1],
