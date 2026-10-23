@@ -79,7 +79,7 @@ $diffCell = static function (array $r): string {
           <td class="auto num"><?= $n($r['use_qty'], 1) ?> <?= View::e($r['unit']) ?></td>
           <?php if ($own): ?>
             <td class="in num"><input type="number" step="any" min="0" name="mat[<?= $mid ?>][per]" value="<?= $raw($r['purchase_qty'], 3) ?>" class="w-80"></td>
-          <?php else: ?><td class="auto num"><?= $n($r['purchase_qty'], 3) ?></td><?php endif; ?>
+          <?php else: ?><td class="auto num"><?= $raw($r['purchase_qty']) ?></td><?php endif; ?>
           <td class="auto num"><?= $r['need'] === null ? '—' : $n($r['need'], 2) ?></td>
         <?php else: ?>
           <td></td><td class="small">（分けて発注）</td><td></td><td></td><td></td><td></td>
