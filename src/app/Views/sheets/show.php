@@ -6,12 +6,14 @@ use App\Services\OrderSheet;
 $title = '原材料発注一覧 ' . $sheet['product_name'];
 $seen = [];
 $n = static fn($v, int $d = 0) => View::e(View::num($v, $d));
+/** 入力欄の値（type="number" はカンマ付きだと空になるため、区切りなしで出す） */
+$raw = static fn($v, int $d = 3): string => ($v === null || $v === '') ? ''
+    : View::e(rtrim(rtrim(number_format((float)$v, $d, '.', ''), '0'), '.'));
 
 /** 発注の入力欄（今ある発注は order[id]、新しい行は new_order[部位-材料][連番]） */
-$orderCells = static function (?array $o, string $key, int $idx) : string {
+$orderCells = static function (?array $o, string $key, int $idx) use ($raw): string {
     $name = $o ? 'order[' . (int)$o['order_id'] . ']' : 'new_order[' . $key . '][' . $idx . ']';
-    $done = $o && $o['status'] === 'delivered';
-    $h  = '<td class="in num"><input type="number" step="any" min="0" name="' . View::e($name) . '[qty]" value="' . View::e($o ? View::num($o['qty'], 3) : '') . '" class="w-80"></td>';
+    $h  = '<td class="in num"><input type="number" step="any" min="0" name="' . View::e($name) . '[qty]" value="' . ($o ? $raw($o['qty']) : '') . '" class="w-80"></td>';
     return $h;
 };
 $dateCells = static function (?array $o, string $key, int $idx): string {
@@ -73,10 +75,10 @@ $diffCell = static function (array $r): string {
           <?php else: ?><td class="auto"><?= View::e($r['vendor_name']) ?></td><?php endif; ?>
           <td><a href="<?= View::e(App::url('/materials/edit?id=' . $mid)) ?>"><?= View::e($r['name']) ?></a>
             <button type="button" class="btn btn-plain btn-small js-split" data-key="<?= View::e($key) ?>">＋分けて発注</button></td>
-          <td class="in num"><input type="number" step="any" min="0" name="pm[<?= $pid ?>][<?= $mid ?>][qty]" value="<?= $n($r['batch_qty'], 3) ?>" class="w-80"></td>
+          <td class="in num"><input type="number" step="any" min="0" name="pm[<?= $pid ?>][<?= $mid ?>][qty]" value="<?= $raw($r['batch_qty'], 3) ?>" class="w-80"></td>
           <td class="auto num"><?= $n($r['use_qty'], 1) ?> <?= View::e($r['unit']) ?></td>
           <?php if ($own): ?>
-            <td class="in num"><input type="number" step="any" min="0" name="mat[<?= $mid ?>][per]" value="<?= $n($r['purchase_qty'], 3) ?>" class="w-80"></td>
+            <td class="in num"><input type="number" step="any" min="0" name="mat[<?= $mid ?>][per]" value="<?= $raw($r['purchase_qty'], 3) ?>" class="w-80"></td>
           <?php else: ?><td class="auto num"><?= $n($r['purchase_qty'], 3) ?></td><?php endif; ?>
           <td class="auto num"><?= $r['need'] === null ? '—' : $n($r['need'], 2) ?></td>
         <?php else: ?>
@@ -132,7 +134,7 @@ $diffCell = static function (array $r): string {
         <td><a href="<?= View::e(App::url('/materials/edit?id=' . $mid)) ?>"><?= View::e($r['name']) ?></a>
           <button type="button" class="btn btn-plain btn-small js-split" data-key="<?= View::e($key) ?>">＋分けて発注</button></td>
         <td class="in"><input type="text" name="pack[<?= (int)$r['sp_id'] ?>][purpose]" value="<?= View::e($r['purpose']) ?>" class="w-200"></td>
-        <td class="in num"><input type="number" step="any" min="0" name="pack[<?= (int)$r['sp_id'] ?>][use_qty]" value="<?= $n($r['use_qty'], 3) ?>" class="w-80"></td>
+        <td class="in num"><input type="number" step="any" min="0" name="pack[<?= (int)$r['sp_id'] ?>][use_qty]" value="<?= $raw($r['use_qty'], 3) ?>" class="w-80"></td>
       <?php else: ?>
         <td></td><td class="small">（分けて発注）</td><td></td><td></td>
       <?php endif; ?>
@@ -165,7 +167,7 @@ $diffCell = static function (array $r): string {
   <?php foreach ($parts as $part): ?>
     <tr>
       <td><a href="<?= View::e(App::url('/parts/show?id=' . (int)$part['part_id'])) ?>"><?= View::e($part['name']) ?></a></td>
-      <td class="in num"><input type="number" step="any" min="0" name="pieces[<?= (int)$part['pp_id'] ?>]" value="<?= $n($part['pieces'], 1) ?>" class="w-80">
+      <td class="in num"><input type="number" step="any" min="0" name="pieces[<?= (int)$part['pp_id'] ?>]" value="<?= $raw($part['pieces'], 1) ?>" class="w-80">
         <?php if ($part['pieces_guess']): ?><span class="small">（今の構成からの目安）</span><?php endif; ?></td>
       <td class="auto num"><?= (int)$part['batches'] ?> B</td>
       <td class="text-center"><input type="checkbox" name="remove_part[<?= (int)$part['pp_id'] ?>]" value="1" title="この商品から部位を外す"></td>
