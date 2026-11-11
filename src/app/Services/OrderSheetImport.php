@@ -214,7 +214,8 @@ class OrderSheetImport
                     $part['pieces'] = round($qty / $part['excel_batches'], 3);
                 } else {
                     $part['pieces'] = 1.0;
-                    $warn[] = '部位「' . $part['name'] . '」の 1Bでできる数 が分からないため、1 で取り込みます。取り込んだあと画面で直してください。';
+                    $part['guessed'] = true;
+                    $warn[] = '部位「' . $part['name'] . '」の 1Bでできる数 が分からないため、1 で取り込みます（すでに登録してある商品の部位なら、今の値のままにします）。取り込んだあと画面で直してください。';
                 }
             }
             $sys = OrderSheet::batches($qty, (float)$part['pieces']);
@@ -307,7 +308,9 @@ class OrderSheetImport
             }
             $ppId = Db::value('SELECT id FROM product_parts WHERE product_id = ? AND part_id = ?', [$productId, $partId]);
             if ($ppId) {
-                Db::exec('UPDATE product_parts SET batch_pieces = ? WHERE id = ?', [$part['pieces'], $ppId]);
+                if (empty($part['guessed'])) {
+                    Db::exec('UPDATE product_parts SET batch_pieces = ? WHERE id = ?', [$part['pieces'], $ppId]);
+                }
             } else {
                 Db::exec('INSERT INTO product_parts (product_id, part_id, fill_qty, fill_unit, pieces_per_fill, use_pieces, batch_pieces, sort_no)
                           VALUES (?,?,0,?,1,1,?,?)', [$productId, $partId, 'g', $part['pieces'], ++$sort]);
