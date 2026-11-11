@@ -48,9 +48,11 @@ if ($showFlow && Auth::check()) {
 }
 $flowDone = Flow::summary($flowSteps);
 
+// 左のメニューエリアは非表示（復活の要望が無ければ後で削除する）
+$showSide = false;
 $tree = [];
 $treeError = false;
-if (Auth::check()) {
+if ($showSide && Auth::check()) {
     try {
         $tree = JobTree::build();
     } catch (\Throwable $e) {
@@ -110,6 +112,7 @@ $flowHref = static function (array $step): string {
 </header>
 
 <div class="layout">
+  <?php if ($showSide): ?>
   <nav class="sidemenu">
     <?php if (Auth::check()): ?>
       <?php if ($flowSteps !== []): ?>
@@ -155,6 +158,7 @@ $flowHref = static function (array $step): string {
       </div>
     <?php endif; ?>
   </nav>
+  <?php endif; ?>
 
   <main class="content">
     <?php foreach (($flash ?? []) as $type => $message): ?>
