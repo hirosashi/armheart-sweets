@@ -1,8 +1,10 @@
 <?php
 namespace App\Services;
 
+use App\Core\Auth;
 use App\Core\Clock;
 use App\Core\Db;
+use App\Core\OperationLog;
 
 /**
  * 原材料発注一覧（Excelと同じ並びのかんたん画面）。
@@ -209,5 +211,40 @@ class OrderSheet
             $rows[] = [$part['name'], $n($part['pieces'], 1), $part['batches']];
         }
         return $rows;
+    }
+
+    /** 一覧の1行ぶんの材料の発注を作る（済なら納品済にする） */
+    public static function createOrder(int $sheetId, int $partId, int $mid, float $qty, ?string $orderDate, ?string $desiredDate, bool $done): void
+    {
+        $m = Db::one('SELECT id, name, supplier_id, vendor_name, purchase_unit FROM materials WHERE id = ? AND deleted_at IS NULL', [$mid]);
+        if ($m === null || $qty <= 0) {
+            return;
+        }
+        $company = Db::one('SELECT id, delivery_place FROM companies ORDER BY is_default DESC, sort_no, id LIMIT 1');
+        $status  = $done ? 'delivered' : ($orderDate !== null ? 'ordered' : 'draft');
+        $orderId = Db::insert(
+            'INSERT INTO purchase_orders (order_no, company_id, supplier_id, vendor_name, delivery_place, status, order_date,
+                    sheet_id, sheet_part_id, desired_date, delivered_date, note, created_by)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [self::nextOrderNo(), $company['id'] ?? null, $m['supplier_id'] ?: null, $m['vendor_name'], $company['delivery_place'] ?? null,
+             $status, $orderDate, $sheetId, $partId > 0 ? $partId : null, $desiredDate,
+             $done ? ($desiredDate ?? Clock::today()) : null, '原材料発注一覧から作成', Auth::id()]
+        );
+        Db::exec(
+            'INSERT INTO purchase_order_items (order_id, material_id, item_name, qty, unit, received_qty, sort_no) VALUES (?,?,?,?,?,?,1)',
+            [$orderId, $mid, $m['name'], $qty, $m['purchase_unit'], $done ? $qty : 0]
+        );
+        OperationLog::write('create', 'purchase_orders', (string)$orderId, '原材料発注一覧から発注を作成しました');
+    }
+
+    /** 発注番号（PO-YYYYMMDD-連番）。発注の管理と同じ形 */
+    public static function nextOrderNo(): string
+    {
+        $prefix = 'PO-' . str_replace('-', '', Clock::today()) . '-';
+        $count  = (int)Db::value('SELECT COUNT(*) FROM purchase_orders WHERE order_no LIKE ?', [$prefix . '%']);
+        do {
+            $no = $prefix . sprintf('%02d', ++$count);
+        } while (Db::value('SELECT id FROM purchase_orders WHERE order_no = ?', [$no]));
+        return $no;
     }
 }

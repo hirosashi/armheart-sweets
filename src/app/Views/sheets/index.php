@@ -41,5 +41,12 @@ $title = '原材料発注一覧';
   製造数 <input type="number" name="qty" min="0" step="1" class="w-100" required>
   <button class="btn">作る</button>
 </form>
+<h2 class="sec-title">Excelから取り込む</h2>
+<form method="post" action="<?= View::e(App::url('/sheets/upload')) ?>" enctype="multipart/form-data" class="inline-form">
+  <?= Csrf::field() ?>
+  <input type="file" name="file" accept=".xlsx" required>
+  <button class="btn">読み込む</button>
+</form>
+<p class="note">「原材料発注一覧」と同じ形のExcel（部位名・発注先・原材料名…の表、資材関連、製造数とB数）を読み込みます。登録する前に、内容を確かめる画面が出ます。</p>
 <p class="note">商品がまだ無いときは「登録・確認」→「商品と配合」で商品名だけ登録してください。部位と原材料は、作ったあとの画面で追加できます。</p>
 <?php endif; ?>

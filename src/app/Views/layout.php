@@ -35,9 +35,11 @@ foreach ($menuSetup as $m) {
     }
 }
 
+// 左メニューの「業務の流れ」は非表示（復活の要望が無ければ後で削除する）
+$showFlow  = false;
 $flowDate  = Clock::today();
 $flowSteps = [];
-if (Auth::check()) {
+if ($showFlow && Auth::check()) {
     try {
         $flowSteps = Flow::steps($flowDate);
     } catch (\Throwable $e) {
@@ -46,9 +48,11 @@ if (Auth::check()) {
 }
 $flowDone = Flow::summary($flowSteps);
 
+// 左のメニューエリアは非表示（復活の要望が無ければ後で削除する）
+$showSide = false;
 $tree = [];
 $treeError = false;
-if (Auth::check()) {
+if ($showSide && Auth::check()) {
     try {
         $tree = JobTree::build();
     } catch (\Throwable $e) {
@@ -108,12 +112,15 @@ $flowHref = static function (array $step): string {
 </header>
 
 <div class="layout">
+  <?php if ($showSide): ?>
   <nav class="sidemenu">
     <?php if (Auth::check()): ?>
+      <?php if ($flowSteps !== []): ?>
       <div class="side-tabs" role="tablist">
         <button type="button" class="side-tab active" data-tab="tree">発注ごと</button>
         <button type="button" class="side-tab" data-tab="flow">業務の流れ</button>
       </div>
+      <?php endif; ?>
       <div class="side-pane" data-pane="tree">
         <?php if ($treeError): ?>
           <div class="tree-empty">発注ごとの表示を作れませんでした。</div>
@@ -151,6 +158,7 @@ $flowHref = static function (array $step): string {
       </div>
     <?php endif; ?>
   </nav>
+  <?php endif; ?>
 
   <main class="content">
     <?php foreach (($flash ?? []) as $type => $message): ?>
