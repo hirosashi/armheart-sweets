@@ -39,6 +39,9 @@ $router->post('/sheets/create', [SheetController::class, 'create']);
 $router->get('/sheets/show',    [SheetController::class, 'show']);
 $router->post('/sheets/save',   [SheetController::class, 'save']);
 $router->get('/sheets/export',  [SheetController::class, 'export']);
+$router->post('/sheets/upload', [SheetController::class, 'upload']);
+$router->get('/sheets/import',  [SheetController::class, 'importForm']);
+$router->post('/sheets/import', [SheetController::class, 'import']);
 
 // 商品と配合
 $router->get('/products',           [ProductController::class, 'index']);

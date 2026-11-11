@@ -11,11 +11,14 @@ use App\Core\Session;
 use App\Core\View;
 use App\Core\Xlsx;
 use App\Services\OrderSheet;
+use App\Services\OrderSheetImport;
 use App\Services\Orders;
 
 /** 原材料発注一覧（Excelと同じ並びのかんたん画面） */
 class SheetController
 {
+    private const MAX_BYTES = 5 * 1024 * 1024;
+
     public static function index(): void
     {
         Auth::requireLogin();
@@ -38,6 +41,85 @@ class SheetController
         $id = Db::insert('INSERT INTO order_sheets (product_id, qty, created_by, updated_by) VALUES (?,?,?,?)',
                          [$productId, $qty, Auth::id(), Auth::id()]);
         OperationLog::write('create', 'order_sheets', (string)$id, '原材料発注一覧を作りました');
+        App::redirect('/sheets/show?id=' . $id);
+    }
+
+    /** Excel（原材料発注一覧）を読み、取り込む前の確認画面へ */
+    public static function upload(): void
+    {
+        self::guard('/sheets');
+        $file = $_FILES['file'] ?? null;
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $tooBig = is_array($file) && in_array($file['error'] ?? 0, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true);
+            Session::flash('warn', $tooBig ? 'ファイルが大きすぎます（5MBまで）。' : 'Excelファイルを選んでください。');
+            App::redirect('/sheets');
+        }
+        if (strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)) !== 'xlsx') {
+            Session::flash('warn', 'Excelファイル（.xlsx）を選んでください。古い形式（.xls）は、Excelで「.xlsx」として保存しなおしてください。');
+            App::redirect('/sheets');
+        }
+        if ((int)$file['size'] > self::MAX_BYTES) {
+            Session::flash('warn', 'ファイルが大きすぎます（5MBまで）。');
+            App::redirect('/sheets');
+        }
+        try {
+            $data = OrderSheetImport::parse(Xlsx::read((string)$file['tmp_name']), (string)$file['name']);
+        } catch (\RuntimeException $e) {
+            Session::flash('warn', $e->getMessage());
+            App::redirect('/sheets');
+        }
+        Session::set('sheet_import', $data);
+        App::redirect('/sheets/import');
+    }
+
+    public static function importForm(): void
+    {
+        Auth::requireLogin();
+        $data = Session::get('sheet_import');
+        if (!is_array($data)) {
+            App::redirect('/sheets');
+        }
+        $products = Db::all('SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name');
+        $match = 0;
+        foreach ($products as $p) {
+            if (preg_replace('/\s+/u', '', mb_convert_kana($p['name'], 'asKV')) === preg_replace('/\s+/u', '', mb_convert_kana($data['product_name'], 'asKV'))) {
+                $match = (int)$p['id'];
+            }
+        }
+        View::render('sheets/import', [
+            'imp' => $data, 'plan' => OrderSheetImport::plan($data), 'products' => $products, 'match' => $match,
+            'canEdit' => Auth::can('order'),
+        ]);
+    }
+
+    public static function import(): void
+    {
+        self::guard('/sheets/import');
+        $data = Session::get('sheet_import');
+        if (!is_array($data)) {
+            App::redirect('/sheets');
+        }
+        $productId = (int)($_POST['product_id'] ?? 0);
+        $newName   = self::str($_POST['product_name'] ?? '', 200);
+        if ($productId > 0 && !Db::value('SELECT id FROM products WHERE id = ? AND deleted_at IS NULL', [$productId])) {
+            $productId = 0;
+        }
+        if ($productId <= 0 && $newName === null) {
+            Session::flash('warn', '商品を選ぶか、新しい商品名を入れてください。');
+            App::redirect('/sheets/import');
+        }
+        $data['qty'] = max(0, (int)($_POST['qty'] ?? $data['qty']));
+        $pdo = Db::conn();
+        $pdo->beginTransaction();
+        try {
+            $id = OrderSheetImport::run($data, $productId, $newName, !empty($_POST['with_stock']));
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        Session::set('sheet_import', null);
+        Session::flash('info', 'Excelの内容を取り込みました。');
         App::redirect('/sheets/show?id=' . $id);
     }
 
@@ -280,27 +362,8 @@ class SheetController
         if ($qty === null || $qty <= 0) {
             return;
         }
-        $m = Db::one('SELECT id, name, supplier_id, vendor_name, purchase_unit FROM materials WHERE id = ? AND deleted_at IS NULL', [$mid]);
-        if ($m === null) {
-            return;
-        }
-        $company   = Db::one('SELECT id, delivery_place FROM companies ORDER BY is_default DESC, sort_no, id LIMIT 1');
-        $orderDate = Clock::normalizeDate($f['order_date'] ?? null);
-        $done      = !empty($f['done']);
-        $status    = $done ? 'delivered' : ($orderDate !== null ? 'ordered' : 'draft');
-        $orderId = Db::insert(
-            'INSERT INTO purchase_orders (order_no, company_id, supplier_id, vendor_name, delivery_place, status, order_date,
-                    sheet_id, sheet_part_id, desired_date, delivered_date, note, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            [self::nextOrderNo(), $company['id'] ?? null, $m['supplier_id'] ?: null, $m['vendor_name'], $company['delivery_place'] ?? null,
-             $status, $orderDate, $sheetId, $partId > 0 ? $partId : null, Clock::normalizeDate($f['desired_date'] ?? null),
-             $done ? Clock::today() : null, '原材料発注一覧から作成', Auth::id()]
-        );
-        Db::exec(
-            'INSERT INTO purchase_order_items (order_id, material_id, item_name, qty, unit, received_qty, sort_no) VALUES (?,?,?,?,?,?,1)',
-            [$orderId, $mid, $m['name'], $qty, $m['purchase_unit'], $done ? $qty : 0]
-        );
-        OperationLog::write('create', 'purchase_orders', (string)$orderId, '原材料発注一覧から発注を作成しました');
+        OrderSheet::createOrder($sheetId, $partId, $mid, $qty, Clock::normalizeDate($f['order_date'] ?? null),
+                                Clock::normalizeDate($f['desired_date'] ?? null), !empty($f['done']));
     }
 
     private static function vendorOf(int $materialId): ?string
@@ -320,17 +383,6 @@ class SheetController
                          [$name, $kind, $kind === 'material' ? 'g' : '個', '原材料発注一覧で追加', Auth::id()]);
         OperationLog::write('create', 'materials', (string)$id, '原材料発注一覧で材料を登録しました：' . $name);
         return $id;
-    }
-
-    /** 発注番号（PO-YYYYMMDD-連番）。発注の管理と同じ形 */
-    private static function nextOrderNo(): string
-    {
-        $prefix = 'PO-' . str_replace('-', '', Clock::today()) . '-';
-        $count  = (int)Db::value('SELECT COUNT(*) FROM purchase_orders WHERE order_no LIKE ?', [$prefix . '%']);
-        do {
-            $no = $prefix . sprintf('%02d', ++$count);
-        } while (Db::value('SELECT id FROM purchase_orders WHERE order_no = ?', [$no]));
-        return $no;
     }
 
     private static function guard(string $back): void
